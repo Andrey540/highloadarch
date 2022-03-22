@@ -1,6 +1,12 @@
 # Учебный проект по курсу Highload Architect
 
-Для запуска сервиса нужно выполнить команды:
+Для запуска сервиса нужно выполнить команду:
+
+```bash
+docker-compose up
+```
+
+Для сборки и запуска сервиса нужно выполнить команды:
 
 ```bash
 make
@@ -8,7 +14,7 @@ docker-compose up --build
 docker-compose down
 ```
 
-Локально зайти в базу
+Зайти в базу
 
 ```bash
 docker exec -it mysql mysql -usocialnetwork -ppasswd socialnetwork
