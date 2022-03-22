@@ -1,0 +1,17 @@
+{{template "authorizedLayout" .}}
+
+{{define "title"}}Sign Up{{end}}
+
+{{define "main"}}
+<div class="row">
+    <h2>
+        Users
+    </h2>
+</div>
+{{range .}}
+<div class="row">
+    <a id="username" class="username" href="/app/profile/{{.ID}}">{{.Username}}</a>
+</div>
+{{end}}
+{{end}}
+{{define "script"}}{{end}}

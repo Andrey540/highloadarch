@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# This script called from Makefile
+# It calls 'go build' to build command package
+
+set -o errexit
+
+echo_call() {
+    echo "$@"
+    "$@"
+}
+
+go_build_package() {
+    local CMD_PACKAGE_DIR=$1
+    if [ ! -d "$CMD_PACKAGE_DIR" ]; then
+        echo "package sources directory '$CMD_PACKAGE_DIR' not exist" 1>&2
+        exit 1
+    fi
+
+    local EXECUTABLE_PATH=$2
+    local BUILD_OUTPUT_DIR
+    BUILD_OUTPUT_DIR=$(dirname "$2")
+    if [ ! -d "$BUILD_OUTPUT_DIR" ]; then
+        echo "build output directory '$BUILD_OUTPUT_DIR' not exist" 1>&2
+        exit 1
+    fi
+
+    local GO_SRC_FILES
+    GO_SRC_FILES=$(find "$CMD_PACKAGE_DIR" -name "*.go" | tr "\n" " ")
+
+    # shellcheck disable=SC2086
+    export CGO_ENABLED=0
+    export GOOS=linux
+
+    echo_call go build -v \
+        -o "$EXECUTABLE_PATH" \
+        $GO_SRC_FILES
+}
+
+for APP_NAME in "$@"
+do
+    go_build_package "cmd/$APP_NAME" "bin/$APP_NAME"
+done

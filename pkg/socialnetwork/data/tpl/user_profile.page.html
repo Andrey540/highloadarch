@@ -1,0 +1,100 @@
+{{template "authorizedLayout" .}}
+
+{{define "title"}}Sign Up{{end}}
+
+{{define "main"}}
+<div class="row">
+    <label for="username">Nickname: </label>
+    <span id="username" class="username">{{.Profile.Username}}</span>
+</div>
+<div class="row">
+    <label for="firstName">First Name: </label>
+    <span id="firstName" class="firstName">{{.Profile.FirstName}}</span>
+</div>
+<div class="row">
+    <label for="lastName">Last Name: </label>
+    <span id="lastName" class="lastName">{{.Profile.LastName}}</span>
+</div>
+<div class="row">
+    <label for="age">Age: </label>
+    <span id="age" class="age">{{.Profile.Age}}</span>
+</div>
+<div class="row">
+    <label for="sex">Sex: </label>
+    <span id="sex" class="sex">
+            {{ if eq .Profile.Sex 0 }} Male
+            {{ else if eq .Profile.Sex 1}} Female
+            {{ end }}
+        </span>
+</div>
+<div class="row">
+    <label for="interests">Interests: </label>
+    <span id="interests" class="interests">{{.Profile.Interests}}</span>
+</div>
+<div class="row">
+    <label for="city">City: </label>
+    <span id="city" class="city">{{.Profile.City}}</span>
+</div>
+<div class="row">
+    <label>Friends: </label>
+    {{range .Friends}}
+    <span class="friend">{{.Username}}</span>
+    {{end}}
+</div>
+<input type="hidden" id="userId" value="{{.Profile.ID}}">
+{{ if not .IsSelfProfile }}
+<button id="addToFriendsButton" {{ if .IsFriend }} style="display:none" {{ end }}>Add To Friends</button>
+<button id="removeFromFriendsButton" {{ if not .IsFriend }} style="display:none" {{ end }}>Remove From Friends</button>
+{{ end }}
+{{end}}
+{{define "script"}}
+<script type="text/javascript">
+    let userId = document.getElementById('userId').value;
+    let addToFriendsButton = document.getElementById('addToFriendsButton');
+    let removeFromFriendsButton = document.getElementById('removeFromFriendsButton');
+
+    addToFriendsButton.addEventListener("click", function(){
+        let xhr = new XMLHttpRequest();
+        //open the request
+        xhr.open('POST','/v1/user/friend/add/' + userId);
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        //send the form data
+        xhr.send(JSON.stringify({}));
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    addToFriendsButton.style.display = "none";
+                    removeFromFriendsButton.style.display = "block";
+                } else {
+                    alert("error");
+                }
+            }
+        }
+        return false;
+    });
+
+    removeFromFriendsButton.addEventListener("click", function(){
+        let xhr = new XMLHttpRequest();
+        //open the request
+        xhr.open('POST','/v1/user/friend/remove/' + userId);
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        //send the form data
+        xhr.send(JSON.stringify({}));
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    addToFriendsButton.style.display = "block";
+                    removeFromFriendsButton.style.display = "none";
+                } else {
+                    alert("error");
+                }
+            }
+        }
+        return false;
+    });
+</script>
+{{end}}

@@ -1,0 +1,60 @@
+{{template "unauthorizedLayout" .}}
+
+{{define "title"}}Sign In{{end}}
+
+{{define "main"}}
+<div class="row">
+    <h2>
+        Sign In
+    </h2>
+</div>
+<div class="row">
+    <form name="registerUser" id="registerUserForm" action="" method="POST">
+        <div class="form-group">
+            <label for="username">Nickname</label>
+            <input type="text" class="form-control" id="username" placeholder="Your Nickname" name="username">
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" class="form-control" id="password" name="password">
+        </div>
+        <button type="submit" class="btn btn-default">Log In</button>
+    </form>
+</div>
+<div class="footer">
+    <a href="/app/register">Sign Up</a>
+</div>
+{{end}}
+
+{{define "script"}}
+<script type="text/javascript">
+    let form = document.getElementById('registerUserForm');
+    form.onsubmit = function(){
+        let xhr = new XMLHttpRequest();
+        let formData = new FormData(form);
+        //open the request
+        xhr.open('POST','/v1/signin');
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        let data = {
+            username: formData.get('username'),
+            password: formData.get('password'),
+        };
+
+        //send the form data
+        xhr.send(JSON.stringify(data));
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    let response = JSON.parse(xhr.response)
+                    window.location = response.redirect_url
+                } else {
+                    alert(xhr.response);
+                }
+            }
+        }
+        return false;
+    }
+</script>
+{{end}}

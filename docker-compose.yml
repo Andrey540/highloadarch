@@ -1,0 +1,35 @@
+version: '3.3'
+
+services:
+  mysql:
+    image: "mysql:8.0"
+    container_name: mysql
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: socialnetwork
+      MYSQL_USER: socialnetwork
+      MYSQL_PASSWORD: passwd
+
+  redis:
+    image: "redis"
+    container_name: redis
+
+  socialnetwork:
+    image: "andrey540/socialnetwork:v1"
+    container_name: socialnetwork
+    build:
+      context: .
+      dockerfile: Dockerfile.socialnetwork
+    ports:
+      - "8884:8002"
+    environment:
+      DB_HOST: mysql
+      DB_NAME: socialnetwork
+      DB_USER: socialnetwork
+      DB_PASSWORD: passwd
+      REDIS_HOST: redis
+      SERVICE_HOST: http://socialnetwork:8002
+      SERVE_REST_ADDRESS: :8002
+    depends_on:
+      - mysql
+      - redis
