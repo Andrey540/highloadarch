@@ -38,7 +38,7 @@
 <div class="row">
     <label>Friends: </label>
     {{range .Friends}}
-    <span class="friend">{{.Username}}</span>
+    <a class="friend" href="/app/profile/{{.ID}}">{{.Username}}</a>
     {{end}}
 </div>
 <input type="hidden" id="userId" value="{{.Profile.ID}}">
