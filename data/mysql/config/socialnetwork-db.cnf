@@ -1,0 +1,16 @@
+; This file contains parameters for studio service
+[mysqld]
+
+; Reduce memory usage
+max_connections = 10
+
+; Use utf8mb4 to support all Unicode characters,
+;  ignore client flavours for character set.
+character_set_server = utf8mb4
+collation_server = utf8mb4_unicode_ci
+skip-character-set-client-handshake
+init_connect='SET collation_connection = utf8mb4_unicode_ci; SET NAMES utf8mb4;'
+
+[mysql]
+; Use utf8mb4 to support all Unicode characters
+default-character-set=utf8mb4

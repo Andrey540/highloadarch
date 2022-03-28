@@ -197,6 +197,7 @@ func serveHTTP(config *config, serverHub *server.Hub, queryService app.UserQuery
 		router.HandleFunc("/v1/signout", logoutUser(sessionService)).Methods(http.MethodPost)
 		router.HandleFunc(registerURL, registerUser(commandsHandler)).Methods(http.MethodPost)
 		router.HandleFunc("/v1/profile/{id}", getUser(queryService)).Methods(http.MethodGet)
+		router.HandleFunc("/v1/profile/find/{username}", findUsers(queryService)).Methods(http.MethodGet)
 		router.HandleFunc("/v1/update/{id}", updateUser(commandsHandler)).Methods(http.MethodPut)
 		router.HandleFunc("/v1/delete/{id}", deleteUser(commandsHandler)).Methods(http.MethodDelete)
 		router.HandleFunc("/v1/user/friend/add/{id}", addUserFriend(commandsHandler)).Methods(http.MethodPost)
@@ -349,6 +350,30 @@ func getUser(service app.UserQueryService) http.HandlerFunc {
 			return
 		}
 		writeUserResponse(user, w)
+	}
+}
+
+func findUsers(service app.UserQueryService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		userName := vars["username"]
+		users, err := service.ListUserProfiles(userName)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		var result = make([]User, len(users))
+		for _, user := range users {
+			result = append(result, convertToUser(user))
+		}
+		data, err := json.Marshal(result)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(data)
 	}
 }
 

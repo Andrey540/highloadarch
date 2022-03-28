@@ -47,6 +47,27 @@ func (s userQueryService) GetUserProfile(id uuid.UUID) (*app.UserProfileDTO, err
 	return result, rows.Close()
 }
 
+func (s userQueryService) ListUserProfiles(userName string) ([]*app.UserProfileDTO, error) {
+	const sqlQuery = selectUserSQL + ` WHERE u.firstName LIKE ? AND lastName LIKE ? ORDER BY id`
+	userNameParameter := userName + "%"
+	rows, err := s.client.Query(sqlQuery, userNameParameter, userNameParameter)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	var users []*app.UserProfileDTO
+	for rows.Next() {
+		user, err1 := scanUserDTO(rows)
+		if err1 != nil {
+			return nil, errors.WithStack(err)
+		}
+		if err1 != nil {
+			return nil, err1
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
 func (s userQueryService) ListUsers() ([]*app.UserListItemDTO, error) {
 	const sqlQuery = `SELECT u.id, u.username FROM user u`
 	rows, err := s.client.Query(sqlQuery)

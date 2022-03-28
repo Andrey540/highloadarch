@@ -30,6 +30,7 @@ type UserFriendDTO struct {
 type UserQueryService interface {
 	GetUserByNameAndPassword(userName, password string) (*UserProfileDTO, error)
 	GetUserProfile(id uuid.UUID) (*UserProfileDTO, error)
+	ListUserProfiles(userName string) ([]*UserProfileDTO, error)
 	ListUsers() ([]*UserListItemDTO, error)
 	ListUserFriends(userID uuid.UUID) ([]*UserFriendDTO, error)
 }
