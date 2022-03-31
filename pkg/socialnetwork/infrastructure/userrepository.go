@@ -36,7 +36,8 @@ func (r userRepository) GetUserByNameAndPassword(userName, password string) (*ap
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return result, rows.Close()
+	defer rows.Close()
+	return result, nil
 }
 
 func (r userRepository) GetUserByName(userName string) (*app.User, error) {
@@ -52,7 +53,8 @@ func (r userRepository) GetUserByName(userName string) (*app.User, error) {
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return result, rows.Close()
+	defer rows.Close()
+	return result, nil
 }
 
 func (r userRepository) Store(user app.User) error {
@@ -92,7 +94,8 @@ func (r userRepository) GetUser(id uuid.UUID) (*app.User, error) {
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return result, rows.Close()
+	defer rows.Close()
+	return result, nil
 }
 
 func (r userRepository) hydrateUser(rows *sql.Rows) (*app.User, error) {

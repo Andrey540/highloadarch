@@ -2,7 +2,7 @@
 [mysqld]
 
 ; Reduce memory usage
-max_connections = 10
+max_connections = 100
 
 ; Use utf8mb4 to support all Unicode characters,
 ;  ignore client flavours for character set.

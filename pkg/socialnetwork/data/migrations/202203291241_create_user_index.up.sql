@@ -1,0 +1,1 @@
+ALTER TABLE user ADD INDEX user_serch_idx (first_name, last_name);

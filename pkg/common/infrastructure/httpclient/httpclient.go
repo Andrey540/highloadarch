@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -73,7 +72,7 @@ func NewHTTPClient(client http.Client) HTTPClient {
 }
 
 func unmarshalJSON(body io.Reader, response interface{}) error {
-	content, err := ioutil.ReadAll(body)
+	content, err := io.ReadAll(body)
 	if err != nil {
 		return errors.WithStack(err)
 	}

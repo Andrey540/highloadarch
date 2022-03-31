@@ -24,23 +24,27 @@ linters:
     - gocyclo
     - gofmt
     - goimports
-    - golint
+    - revive
     - gosec
-    - interfacer
-    - maligned
     - misspell
     - nakedret
     - prealloc
-    - scopelint
+    - exportloopref
     - stylecheck
     - unconvert
     - whitespace
+    - rowserrcheck
+    - goconst
+    - asciicheck
+    - nestif
+    - exportloopref
+    - sqlclosecheck
 
 linters-settings:
   govet:
     check-shadowing: true
   goimports:
-    local-prefixes: userapp
+    local-prefixes: socialnetwork
   gocritic:
     disabled-checks:
       - sloppyReassign

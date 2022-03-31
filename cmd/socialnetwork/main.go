@@ -216,7 +216,7 @@ func serveHTTP(config *config, serverHub *server.Hub, queryService app.UserQuery
 
 		metricsHandler.AddMetricsMiddleware(router)
 		router.Use(server.AuthAPIMiddleware(sessionService, userCtxKey, sessionName, []string{"/v1/"},
-			[]string{signInURL, registerURL}))
+			[]string{signInURL, registerURL, "/v1/profile/find/"}))
 		router.Use(server.AuthAppMiddleware(sessionService, userCtxKey, sessionName, loginPageURL, []string{"/app/"},
 			[]string{registerPageURL}))
 		router.Use(server.RecoverMiddleware(errorLogger))

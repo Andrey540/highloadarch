@@ -1,0 +1,1 @@
+ALTER TABLE user DROP INDEX user_serch_idx;

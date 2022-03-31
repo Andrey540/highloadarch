@@ -28,7 +28,8 @@ func (s userQueryService) GetUserByNameAndPassword(userName, password string) (*
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return result, rows.Close()
+	defer rows.Close()
+	return result, nil
 }
 
 func (s userQueryService) GetUserProfile(id uuid.UUID) (*app.UserProfileDTO, error) {
@@ -44,11 +45,12 @@ func (s userQueryService) GetUserProfile(id uuid.UUID) (*app.UserProfileDTO, err
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return result, rows.Close()
+	defer rows.Close()
+	return result, nil
 }
 
 func (s userQueryService) ListUserProfiles(userName string) ([]*app.UserProfileDTO, error) {
-	const sqlQuery = selectUserSQL + ` WHERE u.firstName LIKE ? AND lastName LIKE ? ORDER BY id`
+	const sqlQuery = selectUserSQL + ` WHERE u.first_name LIKE ? AND u.last_name LIKE ? ORDER BY u.id`
 	userNameParameter := userName + "%"
 	rows, err := s.client.Query(sqlQuery, userNameParameter, userNameParameter)
 	if err != nil {
@@ -65,6 +67,7 @@ func (s userQueryService) ListUserProfiles(userName string) ([]*app.UserProfileD
 		}
 		users = append(users, user)
 	}
+	defer rows.Close()
 	return users, nil
 }
 
@@ -73,6 +76,9 @@ func (s userQueryService) ListUsers() ([]*app.UserListItemDTO, error) {
 	rows, err := s.client.Query(sqlQuery)
 	if err != nil {
 		return nil, errors.WithStack(err)
+	}
+	if rows.Err() != nil {
+		return nil, errors.WithStack(rows.Err())
 	}
 	var users []*app.UserListItemDTO
 	for rows.Next() {
@@ -86,6 +92,7 @@ func (s userQueryService) ListUsers() ([]*app.UserListItemDTO, error) {
 		}
 		users = append(users, &user)
 	}
+	defer rows.Close()
 	return users, nil
 }
 
@@ -94,6 +101,9 @@ func (s userQueryService) ListUserFriends(userID uuid.UUID) ([]*app.UserFriendDT
 	rows, err := s.client.Query(sqlQuery, mysql.BinaryUUID(userID))
 	if err != nil {
 		return nil, errors.WithStack(err)
+	}
+	if rows.Err() != nil {
+		return nil, errors.WithStack(rows.Err())
 	}
 	var result []*app.UserFriendDTO
 	for rows.Next() {

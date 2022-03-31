@@ -18,7 +18,7 @@ services:
     container_name: redis
 
   socialnetwork:
-    image: "andrey540/socialnetwork:v1"
+    image: "andrey540/socialnetwork:v2"
     container_name: socialnetwork
     ports:
       - "8884:8002"
@@ -27,6 +27,7 @@ services:
       DB_NAME: socialnetwork
       DB_USER: socialnetwork
       DB_PASSWORD: passwd
+      DB_MAX_CONN: 50
       REDIS_HOST: redis
       SERVICE_HOST: http://socialnetwork:8002
       SERVE_REST_ADDRESS: :8002
