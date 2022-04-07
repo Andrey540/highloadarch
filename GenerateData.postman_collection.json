@@ -12,7 +12,10 @@
 					"listen": "test",
 					"script": {
 						"exec": [
-							""
+							"if (pm.response.to.have.status(200))",
+							"{",
+							"    pm.collectionVariables.set(\"counter\", parseInt(pm.collectionVariables.get(\"counter\")) + 1);",
+							"}"
 						],
 						"type": "text/javascript"
 					}
@@ -84,7 +87,8 @@
 				"type": "text/javascript",
 				"exec": [
 					"tests[\"[INFO] Request: \" + (('data' in request) ? request['data'] : '') ] = true;",
-					"tests[\"[INFO] Response: \" + responseBody] = true;"
+					"tests[\"[INFO] Response: \" + responseBody] = true;",
+					"tests[\"[INFO] Counter: \" + pm.collectionVariables.get(\"counter\")] = true;"
 				]
 			}
 		}
@@ -128,6 +132,11 @@
 		{
 			"key": "password",
 			"value": "",
+			"type": "default"
+		},
+		{
+			"key": "counter",
+			"value": "1",
 			"type": "default"
 		}
 	]

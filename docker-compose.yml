@@ -1,17 +1,69 @@
-version: '3.3'
+version: '3.5'
 
 services:
-  mysql:
-    image: "percona/percona-server:8.0"
-    container_name: mysql
+  mysql-node-1:
+    image: percona/percona-server:8.0
+    container_name: mysql-node-1
+    hostname: mysql-node-1
+    ports:
+      - "3307:3306"
+    restart: unless-stopped
     environment:
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
       MYSQL_DATABASE: socialnetwork
       MYSQL_USER: socialnetwork
       MYSQL_PASSWORD: passwd
+    command: [ "mysqld",
+               "--loose-group-replication-local-address=mysql-node-1:6606"]
+    healthcheck:
+      test: "mysqladmin ping -u root -p$${MYSQL_ROOT_PASSWORD}"
+      interval: 2s
+      retries: 20
     volumes:
-      - "socialnetwork-db-data:/var/lib/mysql"
+      - "socialnetwork-db-data-1:/var/lib/mysql"
       - "${PWD}/data/mysql/config/:/etc/my.cnf.d"
+
+  mysql-node-2:
+    image: percona/percona-server:8.0
+    container_name: mysql-node-2
+    hostname: mysql-node-2
+    ports:
+      - "3308:3306"
+    restart: unless-stopped
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    command: [ "mysqld",
+               "--loose-group-replication-local-address=mysql-node-2:6606" ]
+    healthcheck:
+      test: "mysqladmin ping -u root -p$${MYSQL_ROOT_PASSWORD}"
+      interval: 2s
+      retries: 20
+    volumes:
+      - "socialnetwork-db-data-2:/var/lib/mysql"
+      - "${PWD}/data/mysql/config/:/etc/my.cnf.d"
+    depends_on:
+      - mysql-node-1
+
+  mysql-node-3:
+    image: percona/percona-server:8.0
+    container_name: mysql-node-3
+    hostname: mysql-node-3
+    ports:
+      - "3309:3306"
+    restart: unless-stopped
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    command: [ "mysqld",
+               "--loose-group-replication-local-address=mysql-node-3:6606"]
+    healthcheck:
+      test: "mysqladmin ping -u root -p$${MYSQL_ROOT_PASSWORD}"
+      interval: 2s
+      retries: 20
+    volumes:
+      - "socialnetwork-db-data-3:/var/lib/mysql"
+      - "${PWD}/data/mysql/config/:/etc/my.cnf.d"
+    depends_on:
+      - mysql-node-1
 
   redis:
     image: "redis"
@@ -23,7 +75,8 @@ services:
     ports:
       - "8884:8002"
     environment:
-      DB_HOST: mysql
+      DB_MASTER_HOST: mysql-node-1
+      DB_SLAVE_HOST: mysql-node-2
       DB_NAME: socialnetwork
       DB_USER: socialnetwork
       DB_PASSWORD: passwd
@@ -32,8 +85,12 @@ services:
       SERVICE_HOST: http://socialnetwork:8002
       SERVE_REST_ADDRESS: :8002
     depends_on:
-      - mysql
+      - mysql-node-1
+      - mysql-node-2
+      - mysql-node-3
       - redis
 
 volumes:
-  socialnetwork-db-data:
+  socialnetwork-db-data-1:
+  socialnetwork-db-data-2:
+  socialnetwork-db-data-3:

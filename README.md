@@ -27,7 +27,7 @@ docker-compose up
 Зайти в базу
 
 ```bash
-docker exec -it mysql mysql -usocialnetwork -ppasswd socialnetwork
+docker exec -it mysql-node-1 mysql -usocialnetwork -ppasswd socialnetwork
 ```
 
 Для генерации тестовых данных выполнить команду

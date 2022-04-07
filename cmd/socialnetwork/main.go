@@ -21,6 +21,7 @@ import (
 	"github.com/callicoder/go-docker/pkg/socialnetwork/app/command"
 	"github.com/callicoder/go-docker/pkg/socialnetwork/infrastructure"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -123,18 +124,27 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 		return err
 	}
 
-	connector := mysql.NewConnector()
-	err = connector.MigrateUp(cnf.dsn(), cnf.MigrationsDir)
+	masterConnector := mysql.NewConnector()
+	err = masterConnector.MigrateUp(cnf.masterDSN(), cnf.MigrationsDir)
 	if err != nil {
 		return err
 	}
-	err = connector.Open(cnf.dsn(), mysql.Config{MaxConnections: cnf.DBMaxConn, ConnectionLifetime: time.Duration(cnf.DBConnectionLifetime) * time.Second})
+	err = masterConnector.Open(cnf.masterDSN(), mysql.Config{MaxConnections: cnf.DBMaxConn, ConnectionLifetime: time.Duration(cnf.DBConnectionLifetime) * time.Second})
 	if err != nil {
 		errorLogger.Println(err)
 		return err
 	}
 	// noinspection GoUnhandledErrorResult
-	defer connector.Close()
+	defer masterConnector.Close()
+
+	slaveConnector := mysql.NewConnector()
+	err = slaveConnector.Open(cnf.slaveDSN(), mysql.Config{MaxConnections: cnf.DBMaxConn, ConnectionLifetime: time.Duration(cnf.DBConnectionLifetime) * time.Second})
+	if err != nil {
+		errorLogger.Println(err)
+		return err
+	}
+	// noinspection GoUnhandledErrorResult
+	defer slaveConnector.Close()
 
 	eventDispatcherErrorsCh := make(chan error)
 	go func() {
@@ -143,7 +153,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 		}
 	}()
 
-	mysqlClient := connector.TransactionalClient()
+	mysqlClient := masterConnector.TransactionalClient()
 	commonUnitOfWorkFactory := infrastructure.NewUnitOfWorkFactory(mysqlClient)
 
 	transports := []commonapp.Transport{}
@@ -153,7 +163,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	commandHandlerFactory := command.NewCommandHandlerFactory()
 	commandsHandler := commonapp.NewCommandsHandler(unitOfWorkFactory, commandHandlerFactory)
 
-	userQueryService := infrastructure.NewUserQueryService(connector.TransactionalClient())
+	userQueryService := infrastructure.NewUserQueryService(slaveConnector.TransactionalClient())
 
 	sessionService, err := redis.NewSessionService(&redis.Config{
 		Password: cnf.RedisPassword,
@@ -261,7 +271,7 @@ func authUser(service app.UserQueryService, sessionService redis.SessionService)
 			return
 		}
 		if user == nil {
-			response.WriteNotFoundResponse(err, w)
+			response.WriteNotFoundResponse(errors.New("User not found"), w)
 			return
 		}
 		session, err := sessionService.SaveSession(user.ID.String())
