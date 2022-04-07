@@ -70,7 +70,7 @@ services:
     container_name: redis
 
   socialnetwork:
-    image: "andrey540/socialnetwork:v2"
+    image: "andrey540/socialnetwork:v3"
     container_name: socialnetwork
     ports:
       - "8884:8002"
