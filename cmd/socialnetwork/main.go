@@ -7,29 +7,28 @@ import (
 	"html/template"
 	stdlog "log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"time"
 
-	commonapp "github.com/callicoder/go-docker/pkg/common/app"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/httpclient"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/metrics"
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/redis"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/response"
+	conversationresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/conversation"
+	userresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/user"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/server"
-	"github.com/callicoder/go-docker/pkg/common/uuid"
-	"github.com/callicoder/go-docker/pkg/socialnetwork/app"
-	"github.com/callicoder/go-docker/pkg/socialnetwork/app/command"
-	"github.com/callicoder/go-docker/pkg/socialnetwork/infrastructure"
+	"github.com/callicoder/go-docker/pkg/socialnetwork/inrastructure"
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 )
 
 const (
 	appID       = "socialnetwork"
 	sessionName = "otussid"
 
-	signInURL   = "/v1/signin"
-	registerURL = "/v1/register"
+	signInURL   = "/api/v1/signin"
+	registerURL = "/api/v1/register"
 
 	loginPageURL     = "/app"
 	registerPageURL  = "/app/register"
@@ -41,66 +40,28 @@ type UserCreatedResponse struct {
 	RedirectURL string `json:"redirect_url"`
 }
 
-type User struct {
-	ID        string `json:"id"`
-	Username  string `json:"username"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-	Age       int    `json:"age"`
-	Sex       int    `json:"sex"`
-	Interests string `json:"interests"`
-	City      string `json:"city"`
-	Password  string `json:"password"`
-}
-
 type ListUserItem struct {
-	ID       string
-	Username string
-}
-
-type UserFriend struct {
 	ID       string
 	Username string
 }
 
 type UserProfilePage struct { // nolint: maligned
 	IsSelfProfile bool
-	Profile       User
-	Friends       []UserFriend
+	Profile       userresponse.Data
+	Friends       []userresponse.Friend
 	IsFriend      bool
 }
 
-type RegisterUserRequest struct {
-	Username  string `json:"username"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-	Age       int    `json:"age"`
-	Sex       int    `json:"sex"`
-	Interests string `json:"interests"`
-	City      string `json:"city"`
-	Password  string `json:"password"`
+type MessageData struct {
+	ID       string
+	UserName string
+	Text     string
 }
 
-type UpdateUserRequest struct {
-	Username  string `json:"username"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-	Age       int    `json:"age"`
-	Sex       int    `json:"sex"`
-	Interests string `json:"interests"`
-	City      string `json:"city"`
-	Password  string `json:"password"`
-}
-
-type AuthRequest struct {
-	UserName string `json:"username"`
-	Password string `json:"password"`
-}
-
-var userCtxKey = &contextKey{"user"}
-
-type contextKey struct {
-	name string
+type ConversationPage struct { // nolint: maligned
+	ID       string
+	UserName string
+	Messages []MessageData
 }
 
 func main() {
@@ -124,28 +85,6 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 		return err
 	}
 
-	masterConnector := mysql.NewConnector()
-	err = masterConnector.MigrateUp(cnf.masterDSN(), cnf.MigrationsDir)
-	if err != nil {
-		return err
-	}
-	err = masterConnector.Open(cnf.masterDSN(), mysql.Config{MaxConnections: cnf.DBMaxConn, ConnectionLifetime: time.Duration(cnf.DBConnectionLifetime) * time.Second})
-	if err != nil {
-		errorLogger.Println(err)
-		return err
-	}
-	// noinspection GoUnhandledErrorResult
-	defer masterConnector.Close()
-
-	slaveConnector := mysql.NewConnector()
-	err = slaveConnector.Open(cnf.slaveDSN(), mysql.Config{MaxConnections: cnf.DBMaxConn, ConnectionLifetime: time.Duration(cnf.DBConnectionLifetime) * time.Second})
-	if err != nil {
-		errorLogger.Println(err)
-		return err
-	}
-	// noinspection GoUnhandledErrorResult
-	defer slaveConnector.Close()
-
 	eventDispatcherErrorsCh := make(chan error)
 	go func() {
 		for err := range eventDispatcherErrorsCh {
@@ -153,17 +92,10 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 		}
 	}()
 
-	mysqlClient := masterConnector.TransactionalClient()
-	commonUnitOfWorkFactory := infrastructure.NewUnitOfWorkFactory(mysqlClient)
-
-	transports := []commonapp.Transport{}
-	eventDispatcher := commonapp.NewStoredEventDispatcher(commonUnitOfWorkFactory, transports, eventDispatcherErrorsCh)
-	unitOfWorkFactory := infrastructure.NewNotifyingUnitOfWorkFactory(commonUnitOfWorkFactory, eventDispatcher.Activate)
-
-	commandHandlerFactory := command.NewCommandHandlerFactory()
-	commandsHandler := commonapp.NewCommandsHandler(unitOfWorkFactory, commandHandlerFactory)
-
-	userQueryService := infrastructure.NewUserQueryService(slaveConnector.TransactionalClient())
+	httpClient := http.Client{Timeout: time.Minute}
+	wrappedClient := httpclient.NewHTTPClient(httpClient)
+	userService := inrastructure.NewUserService(cnf.UserServiceURL, wrappedClient)
+	conversationService := inrastructure.NewConversationService(cnf.ConversationServiceURL, wrappedClient)
 
 	sessionService, err := redis.NewSessionService(&redis.Config{
 		Password: cnf.RedisPassword,
@@ -178,14 +110,13 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	stopChan := make(chan struct{})
 	server.ListenOSKillSignals(stopChan)
 	serverHub := server.NewHub(stopChan)
-	serveHTTP(cnf, serverHub, userQueryService, commandsHandler, sessionService, logger, errorLogger, metricsHandler)
+	serveHTTP(cnf, serverHub, userService, conversationService, sessionService, logger, errorLogger, metricsHandler)
 
 	return serverHub.Wait()
 }
 
-func serveHTTP(config *config, serverHub *server.Hub, queryService app.UserQueryService, commandsHandler commonapp.CommandHandler,
-	sessionService redis.SessionService, logger, errorLogger *stdlog.Logger,
-	metricsHandler metrics.PrometheusMetricsHandler) {
+func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.UserService, conversationService inrastructure.ConversationService,
+	sessionService redis.SessionService, logger, errorLogger *stdlog.Logger, metricsHandler metrics.PrometheusMetricsHandler) {
 	ctx := context.Background()
 	_, cancel := context.WithCancel(ctx)
 	var httpServer *http.Server
@@ -202,32 +133,31 @@ func serveHTTP(config *config, serverHub *server.Hub, queryService app.UserQuery
 		viewUserTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/user_profile.page.html")...))
 		signInTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/login.page.html")...))
 		listUsersTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/user_list.page.html")...))
+		conversationTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/conversation.page.html")...))
 
-		router.HandleFunc(signInURL, authUser(queryService, sessionService)).Methods(http.MethodPost)
-		router.HandleFunc("/v1/signout", logoutUser(sessionService)).Methods(http.MethodPost)
-		router.HandleFunc(registerURL, registerUser(commandsHandler)).Methods(http.MethodPost)
-		router.HandleFunc("/v1/profile/{id}", getUser(queryService)).Methods(http.MethodGet)
-		router.HandleFunc("/v1/profile/find/{username}", findUsers(queryService)).Methods(http.MethodGet)
-		router.HandleFunc("/v1/update/{id}", updateUser(commandsHandler)).Methods(http.MethodPut)
-		router.HandleFunc("/v1/delete/{id}", deleteUser(commandsHandler)).Methods(http.MethodDelete)
-		router.HandleFunc("/v1/user/friend/add/{id}", addUserFriend(commandsHandler)).Methods(http.MethodPost)
-		router.HandleFunc("/v1/user/friend/remove/{id}", removeUserFriend(commandsHandler)).Methods(http.MethodPost)
+		router.HandleFunc(signInURL, authUser(userService, sessionService)).Methods(http.MethodPost)
+		router.HandleFunc("/api/v1/signout", logoutUser(sessionService)).Methods(http.MethodPost)
+		router.HandleFunc(registerURL, registerUser(userService)).Methods(http.MethodPost)
 
 		router.HandleFunc(loginPageURL, renderTemplate(signInTpl)).Methods(http.MethodGet)
 		router.HandleFunc(registerPageURL, renderTemplate(registerUserTpl)).Methods(http.MethodGet)
-		router.HandleFunc(myProfilePageURL, getMyProfile(queryService, viewUserTpl)).Methods(http.MethodGet)
-		router.HandleFunc("/app/profile/{id}", getUserProfile(queryService, viewUserTpl)).Methods(http.MethodGet)
+		router.HandleFunc(myProfilePageURL, getMyProfile(userService, viewUserTpl)).Methods(http.MethodGet)
+		router.HandleFunc("/app/profile/{id}", getUserProfile(userService, viewUserTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/logout", logoutUserWithRedirect(sessionService)).Methods(http.MethodGet)
-		router.HandleFunc("/app/user/list", listUsers(queryService, listUsersTpl)).Methods(http.MethodGet)
+		router.HandleFunc("/app/user/list", listUsers(userService, listUsersTpl)).Methods(http.MethodGet)
+		router.HandleFunc("/app/conversation/user/{id}", getConversation(userService, conversationService, conversationTpl)).Methods(http.MethodGet)
+
+		router.PathPrefix("/user/api/").HandlerFunc(proxyRequest(config.UserServiceURL))
+		router.PathPrefix("/conversation/api/").HandlerFunc(proxyRequest(config.ConversationServiceURL))
 
 		nextRequestID := func() string {
 			return fmt.Sprintf("%d", time.Now().UnixNano())
 		}
 
 		metricsHandler.AddMetricsMiddleware(router)
-		router.Use(server.AuthAPIMiddleware(sessionService, userCtxKey, sessionName, []string{"/v1/"},
-			[]string{signInURL, registerURL, "/v1/profile/find/"}))
-		router.Use(server.AuthAppMiddleware(sessionService, userCtxKey, sessionName, loginPageURL, []string{"/app/"},
+		router.Use(server.AuthAPIMiddleware(sessionService, inrastructure.UserCtxKey, sessionName, []string{"/api/"},
+			[]string{signInURL, registerURL}))
+		router.Use(server.AuthAppMiddleware(sessionService, inrastructure.UserCtxKey, sessionName, loginPageURL, []string{"/app/"},
 			[]string{registerPageURL}))
 		router.Use(server.RecoverMiddleware(errorLogger))
 		router.Use(server.TracingMiddleware(nextRequestID))
@@ -256,25 +186,30 @@ func getTemplateFiles(filename string) []string {
 	}
 }
 
-func authUser(service app.UserQueryService, sessionService redis.SessionService) http.HandlerFunc {
+func proxyRequest(serviceURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		decoder := json.NewDecoder(r.Body)
-		var authRequest AuthRequest
-		err := decoder.Decode(&authRequest)
+		proxyURL, err := url.Parse(serviceURL)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
 			return
 		}
-		user, err := service.GetUserByNameAndPassword(authRequest.UserName, authRequest.Password)
+
+		loggedUserID := getUserIDFromContext(r)
+		r.Header.Set(request.UserIDHeader, loggedUserID)
+
+		proxy := httputil.NewSingleHostReverseProxy(proxyURL)
+		proxy.ServeHTTP(w, r)
+	}
+}
+
+func authUser(userService inrastructure.UserService, sessionService redis.SessionService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authResponse, err := userService.AuthUser(r)
 		if err != nil {
-			response.WriteErrorResponse(err, w)
+			response.WriteUnauthorizedResponse(err.Error(), w)
 			return
 		}
-		if user == nil {
-			response.WriteNotFoundResponse(errors.New("User not found"), w)
-			return
-		}
-		session, err := sessionService.SaveSession(user.ID.String())
+		session, err := sessionService.SaveSession(authResponse.UserID)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
 			return
@@ -319,149 +254,14 @@ func logoutUserWithRedirect(sessionService redis.SessionService) http.HandlerFun
 	}
 }
 
-func registerUser(commandsHandler commonapp.CommandHandler) http.HandlerFunc {
+func registerUser(userService inrastructure.UserService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		registerUserRequest, err := getRegisterUserRequest(r)
+		registerResponse, err := userService.RegisterUser(r)
 		if err != nil {
-			response.WriteErrorResponse(err, w)
+			response.WriteUnauthorizedResponse(err.Error(), w)
 			return
 		}
-		registerUserCommand := command.RegisterUser{
-			ID:        request.GetRequestIDFromRequest(r),
-			Username:  registerUserRequest.Username,
-			FirstName: registerUserRequest.FirstName,
-			LastName:  registerUserRequest.LastName,
-			Age:       registerUserRequest.Age,
-			Sex:       registerUserRequest.Sex,
-			Password:  registerUserRequest.Password,
-			City:      registerUserRequest.City,
-			Interests: registerUserRequest.Interests,
-		}
-		id, err := commandsHandler.Handle(registerUserCommand)
-		if err != nil {
-			processError(err, w)
-			return
-		}
-		writeUserCreatedResponse(id.(uuid.UUID).String(), w)
-	}
-}
-
-func getUser(service app.UserQueryService) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userIDStr := request.GetIDFromRequest(r)
-		userID, err := uuid.FromString(userIDStr)
-		if err != nil {
-			response.WriteErrorResponse(err, w)
-			return
-		}
-		user, err := service.GetUserProfile(userID)
-		if err != nil {
-			response.WriteErrorResponse(err, w)
-			return
-		}
-		writeUserResponse(user, w)
-	}
-}
-
-func findUsers(service app.UserQueryService) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		userName := vars["username"]
-		users, err := service.ListUserProfiles(userName)
-		if err != nil {
-			response.WriteErrorResponse(err, w)
-			return
-		}
-		var result = make([]User, len(users))
-		for _, user := range users {
-			result = append(result, convertToUser(user))
-		}
-		data, err := json.Marshal(result)
-		if err != nil {
-			response.WriteErrorResponse(err, w)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(data)
-	}
-}
-
-func updateUser(commandsHandler commonapp.CommandHandler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		updateUserRequest, err := getUpdateUserRequest(r)
-		if err != nil {
-			response.WriteErrorResponse(err, w)
-			return
-		}
-		userID := request.GetIDFromRequest(r)
-		updateUserCommand := command.UpdateUser{
-			ID:        request.GetRequestIDFromRequest(r),
-			UserID:    userID,
-			Username:  updateUserRequest.Username,
-			FirstName: updateUserRequest.FirstName,
-			LastName:  updateUserRequest.LastName,
-			Age:       updateUserRequest.Age,
-			Sex:       updateUserRequest.Sex,
-			Password:  updateUserRequest.Password,
-			City:      updateUserRequest.City,
-			Interests: updateUserRequest.Interests,
-		}
-		_, err = commandsHandler.Handle(updateUserCommand)
-		if err != nil {
-			response.WriteErrorResponse(err, w)
-			return
-		}
-		response.WriteSuccessResponse(w)
-	}
-}
-
-func deleteUser(commandsHandler commonapp.CommandHandler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID := request.GetIDFromRequest(r)
-		if userID != request.GetUserIDFromHeader(r) {
-			response.WriteForbiddenResponse(w)
-			return
-		}
-		removeUserCommand := command.RemoveUser{ID: request.GetRequestIDFromRequest(r), UserID: userID}
-		_, err := commandsHandler.Handle(removeUserCommand)
-		if err != nil {
-			response.WriteErrorResponse(err, w)
-			return
-		}
-		response.WriteSuccessResponse(w)
-	}
-}
-
-func addUserFriend(commandsHandler commonapp.CommandHandler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID := getUserIDFromContext(r)
-		friendID := request.GetIDFromRequest(r)
-		if userID == friendID {
-			response.WriteSuccessResponse(w)
-			return
-		}
-		addUserFriendCommand := command.AddUserFriend{ID: request.GetRequestIDFromRequest(r), UserID: userID, FriendID: friendID}
-		_, err := commandsHandler.Handle(addUserFriendCommand)
-		if err != nil {
-			response.WriteErrorResponse(err, w)
-			return
-		}
-		response.WriteSuccessResponse(w)
-	}
-}
-
-func removeUserFriend(commandsHandler commonapp.CommandHandler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID := getUserIDFromContext(r)
-		friendID := request.GetIDFromRequest(r)
-		addUserFriendCommand := command.RemoveUserFriend{ID: request.GetRequestIDFromRequest(r), UserID: userID, FriendID: friendID}
-		_, err := commandsHandler.Handle(addUserFriendCommand)
-		if err != nil {
-			response.WriteErrorResponse(err, w)
-			return
-		}
-		response.WriteSuccessResponse(w)
+		writeUserCreatedResponse(registerResponse.UserID, w)
 	}
 }
 
@@ -476,19 +276,14 @@ func renderTemplate(tpl *template.Template) http.HandlerFunc {
 	}
 }
 
-func getMyProfile(service app.UserQueryService, tpl *template.Template) http.HandlerFunc {
+func getMyProfile(userService inrastructure.UserService, tpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, err := getUserUUIDFromContext(r)
+		user, err := userService.GetMyProfile(r)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
 			return
 		}
-		user, err := service.GetUserProfile(userID)
-		if err != nil {
-			response.WriteErrorResponse(err, w)
-			return
-		}
-		friends, err := service.ListUserFriends(userID)
+		friends, err := userService.ListMyFriends(r)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
 			return
@@ -496,8 +291,8 @@ func getMyProfile(service app.UserQueryService, tpl *template.Template) http.Han
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		profile := UserProfilePage{
 			IsSelfProfile: true,
-			Profile:       convertToUser(user),
-			Friends:       convertToFriends(friends),
+			Profile:       user,
+			Friends:       friends,
 			IsFriend:      false,
 		}
 		err = tpl.Execute(w, profile)
@@ -508,37 +303,32 @@ func getMyProfile(service app.UserQueryService, tpl *template.Template) http.Han
 	}
 }
 
-func getUserProfile(service app.UserQueryService, tpl *template.Template) http.HandlerFunc {
+func getUserProfile(userService inrastructure.UserService, tpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		loggedUserID, err := getUserUUIDFromContext(r)
-		if err != nil {
-			response.WriteErrorResponse(err, w)
-		}
-		userID, err := uuid.FromString(request.GetIDFromRequest(r))
+		user, err := userService.GetUserProfile(r)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
 			return
 		}
-		user, err := service.GetUserProfile(userID)
+		friends, err := userService.ListUserFriends(r)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
 			return
 		}
-		friends, err := service.ListUserFriends(userID)
+		loggedUserID := getUserIDFromContext(r)
+		userID := request.GetIDFromRequest(r)
+
+		myFriends, err := userService.ListMyFriends(r)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
 			return
 		}
-		isUserFriend, err := isUserFriend(service, loggedUserID, userID)
-		if err != nil {
-			response.WriteErrorResponse(err, w)
-			return
-		}
+		isUserFriend := isUserFriend(userID, myFriends)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		profile := UserProfilePage{
 			IsSelfProfile: loggedUserID == userID,
-			Profile:       convertToUser(user),
-			Friends:       convertToFriends(friends),
+			Profile:       user,
+			Friends:       friends,
 			IsFriend:      isUserFriend,
 		}
 		err = tpl.Execute(w, profile)
@@ -549,19 +339,19 @@ func getUserProfile(service app.UserQueryService, tpl *template.Template) http.H
 	}
 }
 
-func listUsers(service app.UserQueryService, tpl *template.Template) http.HandlerFunc {
+func listUsers(userService inrastructure.UserService, tpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		users, err := service.ListUsers()
+		users, err := userService.ListUsers(r, []string{})
 		if err != nil {
 			response.WriteErrorResponse(err, w)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		var usersRes = make([]ListUserItem, len(users))
-		for _, user := range users {
-			usersRes = append(usersRes, listUserResponse(user))
+		var result = make([]ListUserItem, len(users))
+		for _, item := range users {
+			result = append(result, listUserResponse(item))
 		}
-		err = tpl.Execute(w, usersRes)
+		err = tpl.Execute(w, result)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
 			return
@@ -569,33 +359,50 @@ func listUsers(service app.UserQueryService, tpl *template.Template) http.Handle
 	}
 }
 
-func listUserResponse(user *app.UserListItemDTO) ListUserItem {
+func getConversation(userService inrastructure.UserService, conversationService inrastructure.ConversationService, tpl *template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		conversationID, err := conversationService.GetConversationID(r)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		messages, err := conversationService.ListMessages(r, conversationID)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		var userIDs []string
+		for _, message := range messages {
+			userIDs = append(userIDs, message.UserID)
+		}
+		loggedUserID := getUserIDFromContext(r)
+		userIDs = append(userIDs, loggedUserID)
+		usersMap, err := getUsersMap(r, userService, userIDs)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		loggedUser := usersMap[loggedUserID]
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		messagesData, err := getMessages(usersMap, messages)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		page := ConversationPage{ID: conversationID, UserName: loggedUser.Username, Messages: messagesData}
+		err = tpl.Execute(w, page)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+	}
+}
+
+func listUserResponse(user userresponse.ListItemDTO) ListUserItem {
 	return ListUserItem{
-		ID:       user.ID.String(),
+		ID:       user.ID,
 		Username: user.Username,
 	}
-}
-
-func convertToUser(user *app.UserProfileDTO) User {
-	return User{
-		ID:        user.ID.String(),
-		Username:  user.Username,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Age:       user.Age,
-		Sex:       user.Sex,
-		Password:  user.Password,
-		Interests: user.Interests,
-		City:      user.City,
-	}
-}
-
-func convertToFriends(friends []*app.UserFriendDTO) []UserFriend {
-	result := make([]UserFriend, len(friends))
-	for _, friend := range friends {
-		result = append(result, UserFriend{ID: friend.ID.String(), Username: friend.Username})
-	}
-	return result
 }
 
 func writeUserAuthResponse(session string, r *http.Request, w http.ResponseWriter) {
@@ -616,79 +423,39 @@ func writeUserCreatedResponse(id string, w http.ResponseWriter) {
 	_, _ = w.Write(data)
 }
 
-func writeUserResponse(user *app.UserProfileDTO, w http.ResponseWriter) {
-	if user == nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	userResponse := User{
-		ID:        user.ID.String(),
-		Username:  user.Username,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Age:       user.Age,
-		Sex:       user.Sex,
-		Password:  user.Password,
-		Interests: user.Interests,
-		City:      user.City,
-	}
-	data, err := json.Marshal(userResponse)
-	if err != nil {
-		response.WriteErrorResponse(err, w)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(data)
-}
-
-func getRegisterUserRequest(r *http.Request) (RegisterUserRequest, error) {
-	decoder := json.NewDecoder(r.Body)
-	var registerUserRequest RegisterUserRequest
-	err := decoder.Decode(&registerUserRequest)
-	return registerUserRequest, err
-}
-
-func getUpdateUserRequest(r *http.Request) (UpdateUserRequest, error) {
-	decoder := json.NewDecoder(r.Body)
-	var updateUserRequest UpdateUserRequest
-	err := decoder.Decode(&updateUserRequest)
-	return updateUserRequest, err
-}
-
-func isUserFriend(service app.UserQueryService, loggedUserID, userID uuid.UUID) (bool, error) {
-	friends, err := service.ListUserFriends(loggedUserID)
-	if err != nil {
-		return false, nil
-	}
+func isUserFriend(loggedUserID string, friends []userresponse.Friend) bool {
 	for _, friend := range friends {
-		if friend.ID == userID {
-			return true, nil
+		if friend.ID == loggedUserID {
+			return true
 		}
 	}
-	return false, nil
-}
-
-func getUserUUIDFromContext(r *http.Request) (uuid.UUID, error) {
-	ctx := r.Context()
-	userSession := ctx.Value(userCtxKey).(*redis.UserSession)
-	return uuid.FromString(userSession.UserID)
+	return false
 }
 
 func getUserIDFromContext(r *http.Request) string {
 	ctx := r.Context()
-	userSession := ctx.Value(userCtxKey).(*redis.UserSession)
+	userSession := ctx.Value(inrastructure.UserCtxKey).(*redis.UserSession)
 	return userSession.UserID
 }
 
-func processError(err error, w http.ResponseWriter) {
-	if err == app.ErrInvalidUserAge || err == app.ErrInvalidUserSex {
-		response.WriteBadRequestResponse(err, w)
-		return
+func getUsersMap(r *http.Request, userService inrastructure.UserService, ids []string) (map[string]userresponse.ListItemDTO, error) {
+	result := make(map[string]userresponse.ListItemDTO)
+	users, err := userService.ListUsers(r, ids)
+	if err != nil {
+		return nil, err
 	}
-	if err == commonapp.ErrCommandAlreadyProcessed {
-		response.WriteDuplicateRequestResponse(err, w)
-		return
+	for _, user := range users {
+		result[user.ID] = user
 	}
-	response.WriteErrorResponse(err, w)
+	return result, nil
+}
+
+func getMessages(usersMap map[string]userresponse.ListItemDTO, messages []conversationresponse.MessageData) ([]MessageData, error) {
+	var result []MessageData
+	for _, message := range messages {
+		if user, found := usersMap[message.UserID]; found {
+			result = append(result, MessageData{ID: message.ID, UserName: user.Username, Text: message.Text})
+		}
+	}
+	return result, nil
 }

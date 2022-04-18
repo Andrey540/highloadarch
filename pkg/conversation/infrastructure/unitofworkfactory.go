@@ -5,7 +5,7 @@ import (
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/command"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/event"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
-	"github.com/callicoder/go-docker/pkg/socialnetwork/app"
+	"github.com/callicoder/go-docker/pkg/conversation/app"
 	"github.com/pkg/errors"
 )
 
@@ -30,12 +30,12 @@ type unitOfWork struct {
 	locks       []mysql.Lock
 }
 
-func (u *unitOfWork) UserRepository() app.UserRepository {
-	return NewUserRepository(u.transaction)
+func (u *unitOfWork) ConversationRepository() app.ConversationRepository {
+	return NewConversationRepository(u.transaction)
 }
 
-func (u *unitOfWork) UserFriendRepository() app.UserFriendRepository {
-	return NewUserFriendRepository(u.transaction)
+func (u *unitOfWork) MessageRepository() app.MessageRepository {
+	return NewMessageRepository(u.transaction)
 }
 
 func (u *unitOfWork) EventStore() commonapp.EventStore {

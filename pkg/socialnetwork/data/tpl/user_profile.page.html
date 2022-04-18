@@ -43,8 +43,15 @@
 </div>
 <input type="hidden" id="userId" value="{{.Profile.ID}}">
 {{ if not .IsSelfProfile }}
-<button id="addToFriendsButton" {{ if .IsFriend }} style="display:none" {{ end }}>Add To Friends</button>
-<button id="removeFromFriendsButton" {{ if not .IsFriend }} style="display:none" {{ end }}>Remove From Friends</button>
+<div class="row">
+    <button id="addToFriendsButton" {{ if .IsFriend }} style="display:none" {{ end }}>Add To Friends</button>
+    <button id="removeFromFriendsButton" {{ if not .IsFriend }} style="display:none" {{ end }}>Remove From Friends
+    </button>
+</div>
+<div class="row">
+    <button id="startConversationButton" {{ if not .IsFriend }} style="display:none" {{ end }}>Start conversation
+    </button>
+</div>
 {{ end }}
 {{end}}
 {{define "script"}}
@@ -52,21 +59,23 @@
     let userId = document.getElementById('userId').value;
     let addToFriendsButton = document.getElementById('addToFriendsButton');
     let removeFromFriendsButton = document.getElementById('removeFromFriendsButton');
+    let startConversationButton = document.getElementById('startConversationButton');
 
-    addToFriendsButton.addEventListener("click", function(){
+    addToFriendsButton.addEventListener("click", function () {
         let xhr = new XMLHttpRequest();
         //open the request
-        xhr.open('POST','/v1/user/friend/add/' + userId);
+        xhr.open('POST', '/user/api/v1/friend/add/' + userId);
         xhr.setRequestHeader("Content-Type", "application/json");
 
         //send the form data
         xhr.send(JSON.stringify({}));
 
-        xhr.onreadystatechange = function() {
+        xhr.onreadystatechange = function () {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status === 200) {
                     addToFriendsButton.style.display = "none";
                     removeFromFriendsButton.style.display = "block";
+                    startConversationButton.style.display = "block";
                 } else {
                     alert("error");
                 }
@@ -75,25 +84,31 @@
         return false;
     });
 
-    removeFromFriendsButton.addEventListener("click", function(){
+    removeFromFriendsButton.addEventListener("click", function () {
         let xhr = new XMLHttpRequest();
         //open the request
-        xhr.open('POST','/v1/user/friend/remove/' + userId);
+        xhr.open('POST', '/user/api/v1/friend/remove/' + userId);
         xhr.setRequestHeader("Content-Type", "application/json");
 
         //send the form data
         xhr.send(JSON.stringify({}));
 
-        xhr.onreadystatechange = function() {
+        xhr.onreadystatechange = function () {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status === 200) {
                     addToFriendsButton.style.display = "block";
                     removeFromFriendsButton.style.display = "none";
+                    startConversationButton.style.display = "none";
                 } else {
                     alert("error");
                 }
             }
         }
+        return false;
+    });
+
+    startConversationButton.addEventListener("click", function () {
+        window.location.href = '/app/conversation/user/' + userId
         return false;
     });
 </script>

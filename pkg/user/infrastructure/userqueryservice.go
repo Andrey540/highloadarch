@@ -5,12 +5,12 @@ import (
 
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
 	"github.com/callicoder/go-docker/pkg/common/uuid"
-	"github.com/callicoder/go-docker/pkg/socialnetwork/app"
+	"github.com/callicoder/go-docker/pkg/user/app"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
 type userQueryService struct {
-	userRepository  app.UserRepository
 	passwordEncoder app.PasswordEncoder
 	client          mysql.Client
 }
@@ -50,7 +50,7 @@ func (s userQueryService) GetUserProfile(id uuid.UUID) (*app.UserProfileDTO, err
 }
 
 func (s userQueryService) ListUserProfiles(userName string) ([]*app.UserProfileDTO, error) {
-	const sqlQuery = selectUserSQL + ` WHERE u.first_name LIKE ? AND u.last_name LIKE ? ORDER BY u.id`
+	const sqlQuery = selectUserSQL + ` WHERE u.first_name LIKE ? AND u.last_name LIKE ? ORDER BY u.id LIMIT 30`
 	userNameParameter := userName + "%"
 	rows, err := s.client.Query(sqlQuery, userNameParameter, userNameParameter)
 	if err != nil {
@@ -62,18 +62,25 @@ func (s userQueryService) ListUserProfiles(userName string) ([]*app.UserProfileD
 		if err1 != nil {
 			return nil, errors.WithStack(err)
 		}
-		if err1 != nil {
-			return nil, err1
-		}
 		users = append(users, user)
 	}
 	defer rows.Close()
 	return users, nil
 }
 
-func (s userQueryService) ListUsers() ([]*app.UserListItemDTO, error) {
-	const sqlQuery = `SELECT u.id, u.username FROM user u`
-	rows, err := s.client.Query(sqlQuery)
+func (s userQueryService) ListUsers(ids []uuid.UUID) ([]*app.UserListItemDTO, error) {
+	sqlQuery := `SELECT u.id, u.username FROM user u`
+	params := []interface{}{}
+	if len(ids) > 0 {
+		filterQuery, filterQueryParams, err := sqlx.In(" WHERE u.id IN (?)", mysql.ConvertToUuids(ids))
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		params = append(params, filterQueryParams...)
+		sqlQuery += filterQuery
+	}
+	sqlQuery += ` LIMIT 30`
+	rows, err := s.client.Query(sqlQuery, params...)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -138,6 +145,5 @@ func NewUserQueryService(client mysql.Client) app.UserQueryService {
 	return &userQueryService{
 		client:          client,
 		passwordEncoder: app.NewPasswordEncoder(),
-		userRepository:  NewUserRepository(client),
 	}
 }

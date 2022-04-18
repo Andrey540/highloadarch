@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 )
@@ -15,38 +14,14 @@ func parseEnv() (*config, error) {
 }
 
 type config struct {
-	DBMasterHost         string `envconfig:"db_master_host"`
-	DBSlaveHost          string `envconfig:"db_slave_host"`
-	DBName               string `envconfig:"db_name"`
-	DBUser               string `envconfig:"db_user"`
-	DBPassword           string `envconfig:"db_password"`
-	DBMaxConn            int    `envconfig:"db_max_conn" default:"0"`
-	DBConnectionLifetime int    `envconfig:"db_conn_lifetime" default:"0"`
-
 	RedisHost     string `envconfig:"redis_host" default:"localhost"`
 	RedisPort     string `envconfig:"redis_port"  default:"6379"`
 	RedisPassword string `envconfig:"redis_password" default:""`
 
 	MigrationsDir string `envconfig:"migrations_dir"`
 
-	ServiceHost      string `envconfig:"service_host" default:"http://socialnetwork:80"`
-	ServeRESTAddress string `envconfig:"serve_rest_address" default:":80"`
-}
-
-func (c *config) masterDSN() mysql.DSN {
-	return mysql.DSN{
-		Host:     c.DBMasterHost,
-		Database: c.DBName,
-		User:     c.DBUser,
-		Password: c.DBPassword,
-	}
-}
-
-func (c *config) slaveDSN() mysql.DSN {
-	return mysql.DSN{
-		Host:     c.DBSlaveHost,
-		Database: c.DBName,
-		User:     c.DBUser,
-		Password: c.DBPassword,
-	}
+	ServiceHost            string `envconfig:"service_host" default:"http://socialnetwork:80"`
+	ServeRESTAddress       string `envconfig:"serve_rest_address" default:":80"`
+	UserServiceURL         string `envconfig:"user_service_url" default:"http://user:80"`
+	ConversationServiceURL string `envconfig:"conversation_service_url" default:"http://conversation:80"`
 }

@@ -47,3 +47,23 @@ func FromString(input string) (u UUID, err error) {
 	u = UUID(impl)
 	return
 }
+
+func ToStrings(uuids []UUID) []string {
+	result := make([]string, 0, len(uuids))
+	for _, uid := range uuids {
+		result = append(result, uid.String())
+	}
+	return result
+}
+
+func FromStrings(ids []string) ([]UUID, error) {
+	result := make([]UUID, 0, len(ids))
+	for _, id := range ids {
+		uid, err := FromString(id)
+		if err != nil {
+			return []UUID{}, err
+		}
+		result = append(result, uid)
+	}
+	return result, nil
+}

@@ -16,14 +16,14 @@ const (
 var errTransport = errors.New("failed to deliver payload")
 
 type HTTPClient interface {
-	MakeJSONRequest(request, response interface{}, method, reqURL string) error
+	MakeJSONRequest(request, response interface{}, method, reqURL string, headers map[string]string) error
 }
 
 type httpClient struct {
 	client http.Client
 }
 
-func (client *httpClient) MakeJSONRequest(request, response interface{}, method, reqURL string) error {
+func (client *httpClient) MakeJSONRequest(request, response interface{}, method, reqURL string, headers map[string]string) error {
 	var bodyReader io.Reader
 	if request != nil {
 		body, err := json.Marshal(request)
@@ -32,7 +32,7 @@ func (client *httpClient) MakeJSONRequest(request, response interface{}, method,
 		}
 		bodyReader = bytes.NewReader(body)
 	}
-	resBody, err := client.makeRequest(bodyReader, jsonContentType, method, reqURL)
+	resBody, err := client.makeRequest(bodyReader, jsonContentType, method, reqURL, headers)
 	if err != nil {
 		return err
 	}
@@ -44,10 +44,15 @@ func (client *httpClient) MakeJSONRequest(request, response interface{}, method,
 	return nil
 }
 
-func (client *httpClient) makeRequest(bodyReader io.Reader, contentType, method, reqURL string) (io.ReadCloser, error) {
+func (client *httpClient) makeRequest(bodyReader io.Reader, contentType, method, reqURL string, headers map[string]string) (io.ReadCloser, error) {
 	req, err := http.NewRequest(method, reqURL, bodyReader)
 	if err != nil {
 		return nil, errors.WithStack(err)
+	}
+	if headers != nil { // nolint: gosimple
+		for key, value := range headers {
+			req.Header.Set(key, value)
+		}
 	}
 	req.Header.Set("Content-Type", contentType)
 	res, err := client.client.Do(req)

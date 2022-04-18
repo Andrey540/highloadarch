@@ -18,3 +18,11 @@ func (uid *BinaryUUID) Scan(src interface{}) error {
 	*uid = BinaryUUID(result)
 	return err
 }
+
+func ConvertToUuids(iDs []uuid.UUID) []BinaryUUID {
+	result := make([]BinaryUUID, 0, len(iDs))
+	for _, id := range iDs {
+		result = append(result, BinaryUUID(id))
+	}
+	return result
+}

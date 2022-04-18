@@ -2,7 +2,7 @@ package infrastructure
 
 import (
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
-	"github.com/callicoder/go-docker/pkg/socialnetwork/app"
+	"github.com/callicoder/go-docker/pkg/user/app"
 	"github.com/pkg/errors"
 )
 

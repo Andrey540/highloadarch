@@ -5,7 +5,7 @@ import (
 
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
 	"github.com/callicoder/go-docker/pkg/common/uuid"
-	"github.com/callicoder/go-docker/pkg/socialnetwork/app"
+	"github.com/callicoder/go-docker/pkg/user/app"
 	"github.com/pkg/errors"
 	satoriuuid "github.com/satori/go.uuid"
 )

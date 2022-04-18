@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	userIDHeader   = "X-UserID"
+	UserIDHeader   = "X-UserID"
 	userRoleHeader = "X-Role"
 	Customer       = "customer"
 	Admin          = "admin"
@@ -20,7 +20,7 @@ func GetIDFromRequest(r *http.Request) string {
 }
 
 func GetUserIDFromHeader(r *http.Request) string {
-	return r.Header.Get(userIDHeader)
+	return r.Header.Get(UserIDHeader)
 }
 
 func GetUserRoleFromHeader(r *http.Request) string {

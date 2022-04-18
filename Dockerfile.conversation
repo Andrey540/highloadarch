@@ -3,12 +3,13 @@ RUN apk --no-cache add ca-certificates
 
 RUN addgroup -g 1001 -S microuser && adduser -u 1001 -S microuser  -G microuser
 
-ADD ./bin/socialnetwork /app/bin/
+ADD ./bin/conversation /app/bin/
 WORKDIR /app
 
-ADD ./pkg/socialnetwork/data/tpl /socialnetwork/data/tpl
+ADD ./pkg/conversation/data/migrations /data/mysql/migrations
+ENV MIGRATIONS_DIR=/data/mysql/migrations
 
 EXPOSE 8000
 
 USER microuser
-CMD ["./bin/socialnetwork"]
+CMD ["./bin/conversation"]

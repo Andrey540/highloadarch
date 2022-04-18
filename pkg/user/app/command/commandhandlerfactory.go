@@ -3,7 +3,7 @@ package command
 import (
 	commonapp "github.com/callicoder/go-docker/pkg/common/app"
 	"github.com/callicoder/go-docker/pkg/common/uuid"
-	"github.com/callicoder/go-docker/pkg/socialnetwork/app"
+	"github.com/callicoder/go-docker/pkg/user/app"
 )
 
 type commandHandlerFactory struct {

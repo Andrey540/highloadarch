@@ -14,7 +14,7 @@ services:
       MYSQL_USER: socialnetwork
       MYSQL_PASSWORD: passwd
     command: [ "mysqld",
-               "--loose-group-replication-local-address=mysql-node-1:6606"]
+               "--loose-group-replication-local-address=mysql-node-1:6606" ]
     healthcheck:
       test: "mysqladmin ping -u root -p$${MYSQL_ROOT_PASSWORD}"
       interval: 2s
@@ -54,7 +54,7 @@ services:
     environment:
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
     command: [ "mysqld",
-               "--loose-group-replication-local-address=mysql-node-3:6606"]
+               "--loose-group-replication-local-address=mysql-node-3:6606" ]
     healthcheck:
       test: "mysqladmin ping -u root -p$${MYSQL_ROOT_PASSWORD}"
       interval: 2s
@@ -70,10 +70,26 @@ services:
     container_name: redis
 
   socialnetwork:
-    image: "andrey540/socialnetwork:v3"
+    image: "andrey540/socialnetwork:v4"
     container_name: socialnetwork
     ports:
-      - "8884:8002"
+      - "8881:8001"
+    environment:
+      REDIS_HOST: redis
+      SERVICE_HOST: http://socialnetwork:8001
+      SERVE_REST_ADDRESS: :8001
+      USER_SERVICE_URL: http://user:8002
+      CONVERSATION_SERVICE_URL: http://conversation:8003
+    depends_on:
+      - user
+      - conversation
+      - redis
+
+  user:
+    image: "andrey540/user:v4"
+    container_name: user
+    ports:
+      - "8882:8002"
     environment:
       DB_MASTER_HOST: mysql-node-1
       DB_SLAVE_HOST: mysql-node-2
@@ -81,14 +97,46 @@ services:
       DB_USER: socialnetwork
       DB_PASSWORD: passwd
       DB_MAX_CONN: 50
-      REDIS_HOST: redis
-      SERVICE_HOST: http://socialnetwork:8002
+      SERVICE_HOST: http://user:8002
       SERVE_REST_ADDRESS: :8002
     depends_on:
       - mysql-node-1
       - mysql-node-2
       - mysql-node-3
-      - redis
+
+  mysql-conversation:
+    image: percona/percona-server:8.0
+    container_name: mysql-conversation
+    hostname: mysql-conversation
+    ports:
+      - "3310:3306"
+    restart: unless-stopped
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: conversation
+      MYSQL_USER: socialnetwork
+      MYSQL_PASSWORD: passwd
+    command: [ "mysqld" ]
+    healthcheck:
+      test: "mysqladmin ping -u root -p$${MYSQL_ROOT_PASSWORD}"
+      interval: 2s
+      retries: 20
+
+  conversation:
+    image: "andrey540/conversation:v4"
+    container_name: conversation
+    ports:
+      - "8883:8003"
+    environment:
+      DB_HOST: mysql-conversation
+      DB_NAME: conversation
+      DB_USER: socialnetwork
+      DB_PASSWORD: passwd
+      DB_MAX_CONN: 50
+      SERVICE_HOST: http://conversation:8003
+      SERVE_REST_ADDRESS: :8003
+    depends_on:
+      - mysql-conversation
 
 volumes:
   socialnetwork-db-data-1:

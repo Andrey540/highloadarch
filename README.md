@@ -37,4 +37,4 @@ chmod +x generate_data.sh
 ./generate_data.sh
 ```
 
-Сервис доступен по url http://127.0.0.1:8884/app
+Сервис доступен по url http://127.0.0.1:8881/app
