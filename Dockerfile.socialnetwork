@@ -1,5 +1,4 @@
 FROM alpine:latest
-RUN apk --no-cache add ca-certificates
 
 RUN addgroup -g 1001 -S microuser && adduser -u 1001 -S microuser  -G microuser
 

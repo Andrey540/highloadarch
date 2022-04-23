@@ -1,0 +1,153 @@
+version: '3.5'
+
+services:
+  vttablet201:
+    command:
+      - sh
+      - -c
+      - /script/vttablet-up.sh 201
+    external_links:
+      - vtctld
+    environment:
+      - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+        -topo_global_root vitess/global
+      - WEB_PORT=8080
+      - GRPC_PORT=15999
+      - CELL=test
+      - KEYSPACE=conversation_keyspace
+      - SHARD=-80
+      - ROLE=primary
+      - VTHOST=vttablet201
+      - EXTERNAL_DB=0
+      - DB_PORT=
+      - DB_HOST=
+      - DB_USER=
+      - DB_PASS=
+      - DB_CHARSET=
+    healthcheck:
+      interval: 30s
+      retries: 15
+      test:
+        - CMD-SHELL
+        - curl -s --fail --show-error localhost:8080/debug/health
+      timeout: 10s
+    image: vitess/lite:${VITESS_TAG:-latest}
+    ports:
+      - 15201:8080
+      - "15999"
+      - "3306"
+    volumes:
+      - "${PWD}/vitess:/script"
+
+  vttablet202:
+    command:
+      - sh
+      - -c
+      - /script/vttablet-up.sh 202
+    external_links:
+      - vtctld
+    environment:
+      - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+        -topo_global_root vitess/global
+      - WEB_PORT=8080
+      - GRPC_PORT=15999
+      - CELL=test
+      - KEYSPACE=conversation_keyspace
+      - SHARD=-80
+      - ROLE=replica
+      - VTHOST=vttablet202
+      - EXTERNAL_DB=0
+      - DB_PORT=
+      - DB_HOST=
+      - DB_USER=
+      - DB_PASS=
+      - DB_CHARSET=
+    healthcheck:
+      interval: 30s
+      retries: 15
+      test:
+        - CMD-SHELL
+        - curl -s --fail --show-error localhost:8080/debug/health
+      timeout: 10s
+    image: vitess/lite:${VITESS_TAG:-latest}
+    ports:
+      - 15202:8080
+      - "15999"
+      - "3306"
+    volumes:
+      - "${PWD}/vitess:/script"
+
+  vttablet301:
+    command:
+      - sh
+      - -c
+      - /script/vttablet-up.sh 301
+    external_links:
+      - vtctld
+    environment:
+      - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+        -topo_global_root vitess/global
+      - WEB_PORT=8080
+      - GRPC_PORT=15999
+      - CELL=test
+      - KEYSPACE=conversation_keyspace
+      - SHARD=80-
+      - ROLE=primary
+      - VTHOST=vttablet301
+      - EXTERNAL_DB=0
+      - DB_PORT=
+      - DB_HOST=
+      - DB_USER=
+      - DB_PASS=
+      - DB_CHARSET=
+    healthcheck:
+      interval: 30s
+      retries: 15
+      test:
+        - CMD-SHELL
+        - curl -s --fail --show-error localhost:8080/debug/health
+      timeout: 10s
+    image: vitess/lite:${VITESS_TAG:-latest}
+    ports:
+      - 15301:8080
+      - "15999"
+      - "3306"
+    volumes:
+      - "${PWD}/vitess:/script"
+  vttablet302:
+    command:
+      - sh
+      - -c
+      - /script/vttablet-up.sh 302
+    external_links:
+      - vtctld
+    environment:
+      - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+        -topo_global_root vitess/global
+      - WEB_PORT=8080
+      - GRPC_PORT=15999
+      - CELL=test
+      - KEYSPACE=conversation_keyspace
+      - SHARD=80-
+      - ROLE=replica
+      - VTHOST=vttablet302
+      - EXTERNAL_DB=0
+      - DB_PORT=
+      - DB_HOST=
+      - DB_USER=
+      - DB_PASS=
+      - DB_CHARSET=
+    healthcheck:
+      interval: 30s
+      retries: 15
+      test:
+        - CMD-SHELL
+        - curl -s --fail --show-error localhost:8080/debug/health
+      timeout: 10s
+    image: vitess/lite:${VITESS_TAG:-latest}
+    ports:
+      - 15302:8080
+      - "15999"
+      - "3306"
+    volumes:
+      - "${PWD}/vitess:/script"

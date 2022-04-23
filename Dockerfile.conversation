@@ -1,5 +1,4 @@
 FROM alpine:latest
-RUN apk --no-cache add ca-certificates
 
 RUN addgroup -g 1001 -S microuser && adduser -u 1001 -S microuser  -G microuser
 
@@ -7,7 +6,9 @@ ADD ./bin/conversation /app/bin/
 WORKDIR /app
 
 ADD ./pkg/conversation/data/migrations /data/mysql/migrations
+ADD ./pkg/conversation/data/schema/vschema.json /data/vitess/schema/vschema.json
 ENV MIGRATIONS_DIR=/data/mysql/migrations
+ENV VSCHEMA_PATH=/data/vitess/schema/vschema.json
 
 EXPOSE 8000
 

@@ -1,0 +1,45 @@
+{
+	"sharded": true,
+	"tables": {
+		"schema_migrations": {
+			"column_vindexes": [
+				{
+					"column": "version",
+					"name": "hash"
+				}
+			]
+		},
+		"conversation": {
+			"column_vindexes": [
+				{
+					"column": "id",
+					"name": "binary_md5_vdx"
+				}
+			]
+		},
+		"message": {
+			"column_vindexes": [
+				{
+					"column": "conversation_id",
+					"name": "binary_md5_vdx"
+				}
+			]
+		},
+		"user_conversation": {
+			"column_vindexes": [
+				{
+					"column": "user_id",
+					"name": "binary_md5_vdx"
+				}
+			]
+		}
+	},
+	"vindexes": {
+		"binary_md5_vdx": {
+			"type": "binary_md5"
+		},
+		"hash": {
+			"type": "hash"
+		}
+	}
+}
