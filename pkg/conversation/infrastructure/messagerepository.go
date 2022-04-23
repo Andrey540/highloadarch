@@ -1,7 +1,7 @@
 package infrastructure
 
 import (
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/sql"
 	"github.com/callicoder/go-docker/pkg/common/uuid"
 	"github.com/callicoder/go-docker/pkg/conversation/app"
 	"github.com/pkg/errors"
@@ -9,7 +9,7 @@ import (
 )
 
 type messageRepository struct {
-	client mysql.Client
+	client sql.Client
 }
 
 func (r messageRepository) NewID() uuid.UUID {
@@ -18,11 +18,11 @@ func (r messageRepository) NewID() uuid.UUID {
 
 func (r messageRepository) Store(message *app.Message) error {
 	const sqlQuery = `INSERT INTO message (id, conversation_id, user_id, text) VALUES(?, ?, ?, ?)`
-	_, err := r.client.Exec(sqlQuery, mysql.BinaryUUID(message.ID), mysql.BinaryUUID(message.ConversationID), mysql.BinaryUUID(message.UserID), message.Text)
+	_, err := r.client.Exec(sqlQuery, sql.BinaryUUID(message.ID), sql.BinaryUUID(message.ConversationID), sql.BinaryUUID(message.UserID), message.Text)
 	return errors.WithStack(err)
 }
 
-func NewMessageRepository(client mysql.Client) app.MessageRepository {
+func NewMessageRepository(client sql.Client) app.MessageRepository {
 	return &messageRepository{
 		client: client,
 	}

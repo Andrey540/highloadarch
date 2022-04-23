@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+
 	"fmt"
 	stdlog "log"
 	"net/http"
@@ -10,12 +11,12 @@ import (
 
 	commonapp "github.com/callicoder/go-docker/pkg/common/app"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/metrics"
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
 	conversationrequest "github.com/callicoder/go-docker/pkg/common/infrastructure/request/conversation"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/response"
 	conversationresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/conversation"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/server"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/vitess"
 	"github.com/callicoder/go-docker/pkg/common/uuid"
 	"github.com/callicoder/go-docker/pkg/conversation/app"
 	"github.com/callicoder/go-docker/pkg/conversation/app/command"
@@ -45,15 +46,28 @@ func main() {
 func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	metricsHandler, err := metrics.NewPrometheusMetricsHandler(appID)
 	if err != nil {
+		errorLogger.Println(err)
 		return err
 	}
 
-	connector := mysql.NewConnector()
-	err = connector.MigrateUp(cnf.dsn(), cnf.MigrationsDir)
+	connector := vitess.NewConnector()
+	/*err = connector.MigrateUp(cnf.dbDsn(), cnf.MigrationsDir, cnf.DBName)
 	if err != nil {
+		errorLogger.Println(err)
+		return err
+	}*/
+	schemaLoader := vitess.NewSchemaLoader(logger)
+	err = schemaLoader.Migrate(cnf.schemaDsn(), cnf.VSchemaPath, cnf.DBName)
+	if err != nil {
+		errorLogger.Println(err)
 		return err
 	}
-	err = connector.Open(cnf.dsn(), mysql.Config{MaxConnections: cnf.DBMaxConn, ConnectionLifetime: time.Duration(cnf.DBConnectionLifetime) * time.Second})
+
+	if err != nil {
+		errorLogger.Println(err)
+		return err
+	}
+	err = connector.Open(cnf.dbDsn(), vitess.Config{MaxConnections: cnf.DBMaxConn, ConnectionLifetime: time.Duration(cnf.DBConnectionLifetime) * time.Second}, "@primary")
 	if err != nil {
 		errorLogger.Println(err)
 		return err
@@ -83,6 +97,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	stopChan := make(chan struct{})
 	server.ListenOSKillSignals(stopChan)
 	serverHub := server.NewHub(stopChan)
+
 	serveHTTP(cnf, serverHub, conversationQueryService, commandsHandler, logger, errorLogger, metricsHandler)
 
 	return serverHub.Wait()
@@ -97,10 +112,10 @@ func serveHTTP(config *config, serverHub *server.Hub, queryService app.Conversat
 		router := mux.NewRouter()
 		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 			response.WriteSuccessResponse(w)
-		}).Methods(http.MethodGet)
+		})
 		router.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 			response.WriteSuccessResponse(w)
-		}).Methods(http.MethodGet)
+		})
 
 		router.HandleFunc(conversationrequest.StartConversationURL, startConversation(commandsHandler)).Methods(http.MethodPost)
 		router.HandleFunc(conversationrequest.AddMessageURL, addMessage(commandsHandler)).Methods(http.MethodPost)
@@ -133,15 +148,16 @@ func serveHTTP(config *config, serverHub *server.Hub, queryService app.Conversat
 func startConversation(commandsHandler commonapp.CommandHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		decoder := json.NewDecoder(r.Body)
-		var startConversationRequest conversationrequest.StartConversation
+		var startConversationRequest conversationrequest.StartUserConversation
 		err := decoder.Decode(&startConversationRequest)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
 			return
 		}
-		startConversationCommand := command.StartConversation{
-			ID:    request.GetRequestIDFromRequest(r),
-			Users: startConversationRequest.Users,
+		startConversationCommand := command.StartUserConversation{
+			ID:     request.GetRequestIDFromRequest(r),
+			User:   startConversationRequest.User,
+			Target: startConversationRequest.Target,
 		}
 		id, err := commandsHandler.Handle(startConversationCommand)
 		if err != nil {

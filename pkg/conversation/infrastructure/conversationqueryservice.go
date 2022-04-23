@@ -2,18 +2,14 @@ package infrastructure
 
 import (
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/sql"
 	"github.com/callicoder/go-docker/pkg/common/uuid"
 	"github.com/callicoder/go-docker/pkg/conversation/app"
 	"github.com/pkg/errors"
 )
 
 type conversationQueryService struct {
-	conversationRepository app.ConversationRepository
-	client                 mysql.Client
-}
-
-func (s conversationQueryService) GetUsersConversation(userIDs []uuid.UUID) (*app.Conversation, error) {
-	return s.conversationRepository.GetUsersConversation(userIDs)
+	client sql.Client
 }
 
 func (s conversationQueryService) ListMessages(conversationID uuid.UUID) ([]*app.Message, error) {
@@ -38,9 +34,8 @@ func (s conversationQueryService) ListMessages(conversationID uuid.UUID) ([]*app
 	return result, nil
 }
 
-func NewConversationQueryService(client mysql.Client) app.ConversationQueryService {
+func NewConversationQueryService(client sql.Client) app.ConversationQueryService {
 	return &conversationQueryService{
-		client:                 client,
-		conversationRepository: NewConversationRepository(client),
+		client: client,
 	}
 }

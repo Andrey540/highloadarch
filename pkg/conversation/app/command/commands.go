@@ -5,16 +5,17 @@ const (
 	AddMessageCommand        = "conversation.add_message"
 )
 
-type StartConversation struct {
-	ID    string   `json:"id"`
-	Users []string `json:"users"`
+type StartUserConversation struct {
+	ID     string `json:"id"`
+	User   string `json:"user"`
+	Target string `json:"target"`
 }
 
-func (command StartConversation) CommandType() string {
+func (command StartUserConversation) CommandType() string {
 	return StartConversationCommand
 }
 
-func (command StartConversation) CommandID() string {
+func (command StartUserConversation) CommandID() string {
 	return command.ID
 }
 

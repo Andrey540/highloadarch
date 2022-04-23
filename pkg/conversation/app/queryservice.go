@@ -5,6 +5,5 @@ import (
 )
 
 type ConversationQueryService interface {
-	GetUsersConversation(userIDs []uuid.UUID) (*Conversation, error)
 	ListMessages(conversationID uuid.UUID) ([]*Message, error)
 }

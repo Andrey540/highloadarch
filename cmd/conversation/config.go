@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/vitess"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 )
@@ -15,10 +15,14 @@ func parseEnv() (*config, error) {
 }
 
 type config struct {
+	SchemaHost string `envconfig:"schema_host"`
+	SchemaPort string `envconfig:"schema_port"`
+
+	VSchemaPath string `envconfig:"vschema_path"`
+
 	DBHost               string `envconfig:"db_host"`
 	DBName               string `envconfig:"db_name"`
-	DBUser               string `envconfig:"db_user"`
-	DBPassword           string `envconfig:"db_password"`
+	DBPort               string `envconfig:"db_port"`
 	DBMaxConn            int    `envconfig:"db_max_conn" default:"0"`
 	DBConnectionLifetime int    `envconfig:"db_conn_lifetime" default:"0"`
 
@@ -28,11 +32,16 @@ type config struct {
 	ServeRESTAddress string `envconfig:"serve_rest_address" default:":80"`
 }
 
-func (c *config) dsn() mysql.DSN {
-	return mysql.DSN{
-		Host:     c.DBHost,
-		Database: c.DBName,
-		User:     c.DBUser,
-		Password: c.DBPassword,
+func (c *config) dbDsn() vitess.DSN {
+	return vitess.DSN{
+		Host: c.DBHost,
+		Port: c.DBPort,
+	}
+}
+
+func (c *config) schemaDsn() vitess.DSN {
+	return vitess.DSN{
+		Host: c.SchemaHost,
+		Port: c.SchemaPort,
 	}
 }

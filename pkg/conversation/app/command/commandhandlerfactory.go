@@ -36,13 +36,17 @@ func NewStartConversationCommandHandler(unitOfWork app.UnitOfWork) commonapp.Com
 }
 
 func (h startConversationCommandHandler) Handle(currentCommand commonapp.Command) (interface{}, error) {
-	command1 := currentCommand.(StartConversation)
+	command1 := currentCommand.(StartUserConversation)
 	return executeUnitOfWork(h.unitOfWork, func(service app.ConversationService) (interface{}, error) {
-		users, err := uuid.FromStrings(command1.Users)
+		user, err := uuid.FromString(command1.User)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
-		return service.StartConversation(users)
+		target, err := uuid.FromString(command1.Target)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		return service.StartUserConversation(user, target)
 	}, "")
 }
 

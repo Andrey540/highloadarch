@@ -14,7 +14,7 @@ type transport struct {
 }
 
 func (t *transport) Send(msgBody string, storedEvent app.StoredEvent) error {
-	return t.connection.Send(storedEvent.ID, msgBody)
+	return t.connection.Send(storedEvent.ID.String(), msgBody)
 }
 
 func (t *transport) SetHandler(handler event.Handler) {

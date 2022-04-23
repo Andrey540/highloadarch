@@ -4,21 +4,21 @@ import (
 	commonapp "github.com/callicoder/go-docker/pkg/common/app"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/command"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/event"
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/sql"
 	"github.com/callicoder/go-docker/pkg/conversation/app"
 	"github.com/pkg/errors"
 )
 
-func NewUnitOfWorkFactory(client mysql.TransactionalClient) commonapp.UnitOfWorkFactory {
+func NewUnitOfWorkFactory(client sql.TransactionalClient) commonapp.UnitOfWorkFactory {
 	return &unitOfWorkFactory{client: client}
 }
 
 type unitOfWorkFactory struct {
-	client mysql.TransactionalClient
+	client sql.TransactionalClient
 }
 
 func (s *unitOfWorkFactory) NewUnitOfWork(lockNames []string) (commonapp.UnitOfWork, error) {
-	transaction, locks, err := mysql.BeginTransaction(s.client, lockNames)
+	transaction, locks, err := sql.BeginTransaction(s.client, lockNames)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -26,8 +26,8 @@ func (s *unitOfWorkFactory) NewUnitOfWork(lockNames []string) (commonapp.UnitOfW
 }
 
 type unitOfWork struct {
-	transaction mysql.Transaction
-	locks       []mysql.Lock
+	transaction sql.Transaction
+	locks       []sql.Lock
 }
 
 func (u *unitOfWork) ConversationRepository() app.ConversationRepository {
@@ -52,9 +52,9 @@ func (u *unitOfWork) ProcessedCommandStore() commonapp.ProcessedCommandStore {
 
 func (u *unitOfWork) GetLocks(lockNames []string) error {
 	for _, lockName := range lockNames {
-		var lock mysql.Lock
+		var lock sql.Lock
 		if lockName != "" {
-			lock = mysql.NewLock(u.transaction, lockName)
+			lock = sql.NewLock(u.transaction, lockName)
 			err := lock.Acquire()
 			if err != nil {
 				return err
@@ -66,5 +66,5 @@ func (u *unitOfWork) GetLocks(lockNames []string) error {
 }
 
 func (u *unitOfWork) Complete(err error) error {
-	return mysql.CompleteTransaction(u.transaction, u.locks, err)
+	return sql.CompleteTransaction(u.transaction, u.locks, err)
 }

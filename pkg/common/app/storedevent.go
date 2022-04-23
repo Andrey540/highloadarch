@@ -1,24 +1,28 @@
 package app
 
+import (
+	"github.com/callicoder/go-docker/pkg/common/uuid"
+)
+
 const (
 	Created int = iota
 	Sent
 )
 
 type StoredEvent struct {
-	ID     string
+	ID     uuid.UUID
 	Status int
 	Type   string
 	Body   string
 }
 
 type EventStore interface {
-	NewUID() string
+	NewUID() uuid.UUID
 	Store(storedEvent StoredEvent) error
 	GetCreated() ([]StoredEvent, error)
 }
 
-func NewStoredEvent(id, eventType, body string) StoredEvent {
+func NewStoredEvent(id uuid.UUID, eventType, body string) StoredEvent {
 	return StoredEvent{
 		ID:   id,
 		Type: eventType,
@@ -31,15 +35,15 @@ type Transport interface {
 }
 
 type ProcessedEvent struct {
-	ID string
+	ID uuid.UUID
 }
 
 type ProcessedEventStore interface {
 	Store(processedEvent ProcessedEvent) error
-	GetEvent(ID string) (*ProcessedEvent, error)
+	GetEvent(ID uuid.UUID) (*ProcessedEvent, error)
 }
 
-func NewProcessedEvent(id string) ProcessedEvent {
+func NewProcessedEvent(id uuid.UUID) ProcessedEvent {
 	return ProcessedEvent{
 		ID: id,
 	}

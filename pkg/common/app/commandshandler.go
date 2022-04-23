@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 
+	"github.com/callicoder/go-docker/pkg/common/uuid"
 	"github.com/pkg/errors"
 )
 
@@ -27,7 +28,11 @@ func (handler *handler) Handle(command Command) (interface{}, error) {
 	return handler.executeUnitOfWork(func(unitOfWork UnitOfWork) (interface{}, error) {
 		processedCommandStore := unitOfWork.ProcessedCommandStore()
 		if command.CommandID() != "" {
-			processedCommand, err := processedCommandStore.GetCommand(command.CommandID())
+			commandID, err := uuid.FromString(command.CommandID())
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+			processedCommand, err := processedCommandStore.GetCommand(commandID)
 			if err != nil {
 				return nil, err
 			}
@@ -47,7 +52,11 @@ func (handler *handler) Handle(command Command) (interface{}, error) {
 			return nil, err
 		}
 		if command.CommandID() != "" {
-			err = processedCommandStore.Store(NewProcessedCommand(command.CommandID()))
+			commandID, err1 := uuid.FromString(command.CommandID())
+			if err1 != nil {
+				return nil, errors.WithStack(err1)
+			}
+			err = processedCommandStore.Store(NewProcessedCommand(commandID))
 		}
 		return result, err
 	}, lockName)

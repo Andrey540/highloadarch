@@ -20,7 +20,7 @@ func (s ConversationService) GetConversationID(r *http.Request) (string, error) 
 	headers := getHeaders(r)
 	userID := request.GetIDFromRequest(r)
 	loggedUserID := getUserIDFromContext(r)
-	startConversationRequest := conversationrequest.StartConversation{Users: []string{loggedUserID, userID}}
+	startConversationRequest := conversationrequest.StartUserConversation{User: loggedUserID, Target: userID}
 	err := s.client.MakeJSONRequest(startConversationRequest, &response, http.MethodPost, s.baseURL+conversationrequest.StartConversationURL, headers)
 	return response.ConversationID, err
 }

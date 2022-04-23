@@ -92,7 +92,7 @@ services:
       - "8882:8002"
     environment:
       DB_MASTER_HOST: mysql-node-1
-      DB_SLAVE_HOST: mysql-node-2
+      DB_SLAVE_HOST: mysql-node-1
       DB_NAME: socialnetwork
       DB_USER: socialnetwork
       DB_PASSWORD: passwd
@@ -104,39 +104,397 @@ services:
       - mysql-node-2
       - mysql-node-3
 
-  mysql-conversation:
-    image: percona/percona-server:8.0
-    container_name: mysql-conversation
-    hostname: mysql-conversation
-    ports:
-      - "3310:3306"
-    restart: unless-stopped
-    environment:
-      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
-      MYSQL_DATABASE: conversation
-      MYSQL_USER: socialnetwork
-      MYSQL_PASSWORD: passwd
-    command: [ "mysqld" ]
-    healthcheck:
-      test: "mysqladmin ping -u root -p$${MYSQL_ROOT_PASSWORD}"
-      interval: 2s
-      retries: 20
-
   conversation:
     image: "andrey540/conversation:v4"
     container_name: conversation
     ports:
       - "8883:8003"
     environment:
-      DB_HOST: mysql-conversation
-      DB_NAME: conversation
+      SCHEMA_HOST: vtctld
+      SCHEMA_PORT: 15999
+      DB_HOST: vtgate
+      DB_PORT: 15999
+      DB_NAME: conversation_keyspace
       DB_USER: socialnetwork
       DB_PASSWORD: passwd
       DB_MAX_CONN: 50
       SERVICE_HOST: http://conversation:8003
       SERVE_REST_ADDRESS: :8003
+    healthcheck:
+      interval: 30s
+      retries: 15
+      test:
+        - CMD-SHELL
+        - wget -nv -t1 --spider localhost:8003/health
     depends_on:
-      - mysql-conversation
+      - vtgate
+      - vtctld
+
+  consul1:
+    command: agent -server -bootstrap-expect 3 -ui -disable-host-node-id -client 0.0.0.0
+    hostname: consul1
+    image: consul:latest
+    ports:
+      - 8400:8400
+      - 8500:8500
+      - 8600:8600
+
+  consul2:
+    command: agent -server -retry-join consul1 -disable-host-node-id
+    depends_on:
+      - consul1
+    expose:
+      - "8400"
+      - "8500"
+      - "8600"
+    hostname: consul2
+    image: consul:latest
+
+  consul3:
+    command: agent -server -retry-join consul1 -disable-host-node-id
+    depends_on:
+      - consul1
+    expose:
+      - "8400"
+      - "8500"
+      - "8600"
+    hostname: consul3
+    image: consul:latest
+
+  schemaload_conversation_keyspace:
+    command:
+      - sh
+      - -c
+      - /script/schemaload.sh
+    depends_on:
+      - vttablet101
+    environment:
+      - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+        -topo_global_root vitess/global
+      - WEB_PORT=8080
+      - GRPC_PORT=15999
+      - CELL=test
+      - KEYSPACE=conversation_keyspace
+      - TARGETTAB=test-0000000101
+      - SLEEPTIME=15
+      - VSCHEMA_FILE=conversation_keyspace_vschema.json
+      - SCHEMA_FILES=conversation_keyspace_schema_file.sql
+      - POST_LOAD_FILE=
+      - EXTERNAL_DB=0
+    image: vitess/lite:${VITESS_TAG:-latest}
+    volumes:
+      - "${PWD}/vitess:/script"
+
+  vreplication:
+    command:
+      - sh
+      - -c
+      - '[ $$EXTERNAL_DB -eq 1 ] && /script/externaldb_vreplication.sh || exit 0'
+    depends_on:
+      - vtctld
+    environment:
+      - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+        -topo_global_root vitess/global
+      - EXTERNAL_DB=0
+    image: vitess/lite:${VITESS_TAG:-latest}
+    volumes:
+      - "${PWD}/vitess:/script"
+
+  vtctld:
+    command:
+      - sh
+      - -c
+      - ' /vt/bin/vtctld -topo_implementation consul -topo_global_server_address consul1:8500
+      -topo_global_root vitess/global -cell test -workflow_manager_init -workflow_manager_use_election
+      -service_map ''grpc-vtctl'' -backup_storage_implementation file -file_backup_storage_root
+      /vt/vtdataroot/backups -logtostderr=true -port 8080 -grpc_port 15999 '
+    image: vitess/lite:${VITESS_TAG:-latest}
+    ports:
+      - 15000:8080
+      - "15999"
+    volumes:
+      - "${PWD}/vitess:/script"
+
+  vtgate:
+    command:
+      - sh
+      - -c
+      - '/script/run-forever.sh /vt/bin/vtgate -topo_implementation consul -topo_global_server_address
+      consul1:8500 -topo_global_root vitess/global -logtostderr=true -port 8080 -grpc_port
+      15999 -mysql_server_port 15306 -mysql_auth_server_impl none -cell test -cells_to_watch
+      test -tablet_types_to_wait PRIMARY,REPLICA,RDONLY -service_map ''grpc-vtgateservice''
+      -normalize_queries=true '
+    depends_on:
+      - vtctld
+      - vtorc
+      - vttablet102
+    image: vitess/lite:${VITESS_TAG:-latest}
+    ports:
+      - 15099:8080
+      - "15999"
+      - 15306:15306
+    volumes:
+      - "${PWD}/vitess:/script"
+
+  vtorc:
+    command:
+      - sh
+      - -c
+      - /script/vtorc-up.sh
+    depends_on:
+      - vtctld
+    environment:
+      - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+        -topo_global_root vitess/global
+      - EXTERNAL_DB=0
+      - DB_USER=
+      - DB_PASS=
+    image: vitess/lite:${VITESS_TAG:-latest}
+    ports:
+      - 13000:3000
+    volumes:
+      - "${PWD}/vitess:/script"
+
+  vttablet101:
+    command:
+      - sh
+      - -c
+      - /script/vttablet-up.sh 101
+    depends_on:
+      - vtctld
+    environment:
+      - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+        -topo_global_root vitess/global
+      - WEB_PORT=8080
+      - GRPC_PORT=15999
+      - CELL=test
+      - KEYSPACE=conversation_keyspace
+      - SHARD=0
+      - ROLE=primary
+      - VTHOST=vttablet101
+      - EXTERNAL_DB=0
+      - DB_PORT=
+      - DB_HOST=
+      - DB_USER=
+      - DB_PASS=
+      - DB_CHARSET=
+    healthcheck:
+      interval: 30s
+      retries: 15
+      test:
+        - CMD-SHELL
+        - curl -s --fail --show-error localhost:8080/debug/health
+      timeout: 10s
+    image: vitess/lite:${VITESS_TAG:-latest}
+    ports:
+      - 15101:8080
+      - "15999"
+      - "3306"
+    volumes:
+      - "${PWD}/vitess:/script"
+
+  vttablet102:
+    command:
+      - sh
+      - -c
+      - /script/vttablet-up.sh 102
+    depends_on:
+      - vtctld
+    environment:
+      - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+        -topo_global_root vitess/global
+      - WEB_PORT=8080
+      - GRPC_PORT=15999
+      - CELL=test
+      - KEYSPACE=conversation_keyspace
+      - SHARD=0
+      - ROLE=replica
+      - VTHOST=vttablet102
+      - EXTERNAL_DB=0
+      - DB_PORT=
+      - DB_HOST=
+      - DB_USER=
+      - DB_PASS=
+      - DB_CHARSET=
+    healthcheck:
+      interval: 30s
+      retries: 15
+      test:
+        - CMD-SHELL
+        - curl -s --fail --show-error localhost:8080/debug/health
+      timeout: 10s
+    image: vitess/lite:${VITESS_TAG:-latest}
+    ports:
+      - 15102:8080
+      - "15999"
+      - "3306"
+    volumes:
+      - "${PWD}/vitess:/script"
+
+ # vttablet201:
+ #   command:
+ #     - sh
+ #     - -c
+ #     - /script/vttablet-up.sh 201
+ #   depends_on:
+ #     - vtctld
+ #   environment:
+ #     - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+ #       -topo_global_root vitess/global
+ #     - WEB_PORT=8080
+ #     - GRPC_PORT=15999
+ #     - CELL=test
+ #     - KEYSPACE=conversation_keyspace
+ #     - SHARD=-80
+ #     - ROLE=primary
+ #     - VTHOST=vttablet201
+ #     - EXTERNAL_DB=0
+ #     - DB_PORT=
+ #     - DB_HOST=
+ #     - DB_USER=
+ #     - DB_PASS=
+ #     - DB_CHARSET=
+ #   healthcheck:
+ #     interval: 30s
+ #     retries: 15
+ #     test:
+ #       - CMD-SHELL
+ #       - curl -s --fail --show-error localhost:8080/debug/health
+ #     timeout: 10s
+ #   image: vitess/lite:${VITESS_TAG:-latest}
+ #   ports:
+ #     - 15201:8080
+ #     - "15999"
+ #     - "3306"
+ #   volumes:
+ #     - "${PWD}/vitess:/script"
+#
+ # vttablet202:
+ #   command:
+ #     - sh
+ #     - -c
+ #     - /script/vttablet-up.sh 202
+ #   depends_on:
+ #     - vtctld
+ #   environment:
+ #     - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+ #       -topo_global_root vitess/global
+ #     - WEB_PORT=8080
+ #     - GRPC_PORT=15999
+ #     - CELL=test
+ #     - KEYSPACE=conversation_keyspace
+ #     - SHARD=-80
+ #     - ROLE=replica
+ #     - VTHOST=vttablet202
+ #     - EXTERNAL_DB=0
+ #     - DB_PORT=
+ #     - DB_HOST=
+ #     - DB_USER=
+ #     - DB_PASS=
+ #     - DB_CHARSET=
+ #   healthcheck:
+ #     interval: 30s
+ #     retries: 15
+ #     test:
+ #       - CMD-SHELL
+ #       - curl -s --fail --show-error localhost:8080/debug/health
+ #     timeout: 10s
+ #   image: vitess/lite:${VITESS_TAG:-latest}
+ #   ports:
+ #     - 15202:8080
+ #     - "15999"
+ #     - "3306"
+ #   volumes:
+ #     - "${PWD}/vitess:/script"
+#
+ # vttablet301:
+ #   command:
+ #     - sh
+ #     - -c
+ #     - /script/vttablet-up.sh 301
+ #   depends_on:
+ #     - vtctld
+ #   environment:
+ #     - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+ #       -topo_global_root vitess/global
+ #     - WEB_PORT=8080
+ #     - GRPC_PORT=15999
+ #     - CELL=test
+ #     - KEYSPACE=conversation_keyspace
+ #     - SHARD=80-
+ #     - ROLE=primary
+ #     - VTHOST=vttablet301
+ #     - EXTERNAL_DB=0
+ #     - DB_PORT=
+ #     - DB_HOST=
+ #     - DB_USER=
+ #     - DB_PASS=
+ #     - DB_CHARSET=
+ #   healthcheck:
+ #     interval: 30s
+ #     retries: 15
+ #     test:
+ #       - CMD-SHELL
+ #       - curl -s --fail --show-error localhost:8080/debug/health
+ #     timeout: 10s
+ #   image: vitess/lite:${VITESS_TAG:-latest}
+ #   ports:
+ #     - 15301:8080
+ #     - "15999"
+ #     - "3306"
+ #   volumes:
+ #     - "${PWD}/vitess:/script"
+ # vttablet302:
+ #   command:
+ #     - sh
+ #     - -c
+ #     - /script/vttablet-up.sh 302
+ #   depends_on:
+ #     - vtctld
+ #   environment:
+ #     - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+ #       -topo_global_root vitess/global
+ #     - WEB_PORT=8080
+ #     - GRPC_PORT=15999
+ #     - CELL=test
+ #     - KEYSPACE=conversation_keyspace
+ #     - SHARD=80-
+ #     - ROLE=replica
+ #     - VTHOST=vttablet302
+ #     - EXTERNAL_DB=0
+ #     - DB_PORT=
+ #     - DB_HOST=
+ #     - DB_USER=
+ #     - DB_PASS=
+ #     - DB_CHARSET=
+ #   healthcheck:
+ #     interval: 30s
+ #     retries: 15
+ #     test:
+ #       - CMD-SHELL
+ #       - curl -s --fail --show-error localhost:8080/debug/health
+ #     timeout: 10s
+ #   image: vitess/lite:${VITESS_TAG:-latest}
+ #   ports:
+ #     - 15302:8080
+ #     - "15999"
+ #     - "3306"
+ #   volumes:
+ #     - "${PWD}/vitess:/script"
+
+  vtwork:
+    command:
+      - sh
+      - -c
+      - '/vt/bin/vtworker -topo_implementation consul -topo_global_server_address consul1:8500
+      -topo_global_root vitess/global -cell test -logtostderr=true -service_map ''grpc-vtworker''
+      -port 8080 -grpc_port 15999 -use_v3_resharding_mode=true '
+    depends_on:
+      - vtctld
+    image: vitess/lite:${VITESS_TAG:-latest}
+    ports:
+      - "8080"
+      - "15999"
 
 volumes:
   socialnetwork-db-data-1:

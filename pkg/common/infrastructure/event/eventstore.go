@@ -3,57 +3,49 @@ package event
 import (
 	"github.com/callicoder/go-docker/pkg/common/app"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure"
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/postgres"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/sql"
+	"github.com/callicoder/go-docker/pkg/common/uuid"
 	"github.com/pkg/errors"
-
-	"strconv"
-
-	uuid "github.com/satori/go.uuid"
 )
 
 type eventStore struct {
-	client postgres.Client
+	client sql.Client
 }
 
-func (store *eventStore) NewUID() string {
-	return uuid.UUID(infrastructure.NewUUID()).String()
+func (store *eventStore) NewUID() uuid.UUID {
+	return uuid.UUID(infrastructure.NewUUID())
 }
 
 func (store *eventStore) Store(storedEvent app.StoredEvent) error {
-	const query = `INSERT INTO stored_event (id, status, type, body) VALUES ($1, $2, $3, $4)
-	               ON CONFLICT (id) DO UPDATE
-	               SET status = excluded.status;`
+	const query = `INSERT INTO stored_event (id, status, type, body) VALUES (?, ?, ?, ?)
+                   ON DUPLICATE KEY UPDATE status=VALUES(status);`
 	_, err := store.client.Exec(query, storedEvent.ID, storedEvent.Status, storedEvent.Type, storedEvent.Body)
 	return err
 }
 
 func (store *eventStore) GetCreated() ([]app.StoredEvent, error) {
-	query := "SELECT id, status, type, body FROM stored_event WHERE status = $1 ORDER BY id"
-	var storedEvents []sqlxStoredEvent
-	err := store.client.Select(&storedEvents, query, app.Created)
+	query := "SELECT id, status, type, body FROM stored_event WHERE status = ? ORDER BY id"
+	rows, err := store.client.Query(query, app.Created)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-
-	var result = make([]app.StoredEvent, 0, len(storedEvents))
-	for _, event := range storedEvents {
-		status, err := strconv.Atoi(event.Status)
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-		result = append(result, app.StoredEvent{ID: event.ID, Status: status, Type: event.EventType, Body: event.Body})
+	if rows.Err() != nil {
+		return nil, errors.WithStack(rows.Err())
 	}
 
+	var result []app.StoredEvent
+	for rows.Next() {
+		var storedEvent app.StoredEvent
+		err1 := rows.Scan(&storedEvent.ID, &storedEvent.Status, &storedEvent.Type, &storedEvent.Body)
+		if err1 != nil {
+			return []app.StoredEvent{}, errors.WithStack(err)
+		}
+		result = append(result, storedEvent)
+	}
+	defer rows.Close()
 	return result, nil
 }
 
-func NewEventStore(client postgres.Client) app.EventStore {
+func NewEventStore(client sql.Client) app.EventStore {
 	return &eventStore{client: client}
-}
-
-type sqlxStoredEvent struct {
-	ID        string `db:"id"`
-	Status    string `db:"status"`
-	EventType string `db:"type"`
-	Body      string `db:"body"`
 }

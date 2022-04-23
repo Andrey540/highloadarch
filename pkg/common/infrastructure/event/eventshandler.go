@@ -3,10 +3,10 @@ package event
 import (
 	"encoding/json"
 	"fmt"
+	stdlog "log"
 
 	"github.com/callicoder/go-docker/pkg/common/app"
-
-	stdlog "log"
+	"github.com/callicoder/go-docker/pkg/common/uuid"
 )
 
 const (
@@ -27,13 +27,17 @@ type handler struct {
 
 func (handler *handler) Handle(msg string) error {
 	handler.logger.Println("Event received: " + msg)
-	storedEvent := app.NewStoredEvent("", "", "")
+	storedEvent := app.NewStoredEvent(uuid.Nil, "", "")
 	err := json.Unmarshal([]byte(msg), &storedEvent)
 	if err != nil {
 		handler.errorLogger.Println(err)
 		return err
 	}
-	lockName := handler.getEventLockName(storedEvent.ID)
+	lockID := ""
+	if storedEvent.ID != uuid.Nil {
+		lockID = storedEvent.ID.String()
+	}
+	lockName := handler.getEventLockName(lockID)
 	return handler.executeUnitOfWork(func(unitOfWork app.UnitOfWork) error {
 		processedEventStore := unitOfWork.ProcessedEventStore()
 		processedEvent, err := processedEventStore.GetEvent(storedEvent.ID)

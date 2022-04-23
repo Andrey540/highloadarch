@@ -6,6 +6,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var ErrInvalidUsers = errors.New("Invalid number of users")
+
 type Conversation struct {
 	ID      uuid.UUID
 	UserIDs []uuid.UUID
@@ -20,7 +22,7 @@ type Message struct {
 
 type ConversationRepository interface {
 	NewID() uuid.UUID
-	GetUsersConversation(userIDs []uuid.UUID) (*Conversation, error)
+	GetUserConversation(userID, target uuid.UUID) (*Conversation, error)
 	Store(conversation *Conversation) error
 }
 
@@ -30,7 +32,7 @@ type MessageRepository interface {
 }
 
 type ConversationService interface {
-	StartConversation(userIDs []uuid.UUID) (uuid.UUID, error)
+	StartUserConversation(userID, target uuid.UUID) (uuid.UUID, error)
 	AddMessage(conversationID, userID uuid.UUID, text string) (uuid.UUID, error)
 }
 
@@ -40,14 +42,15 @@ type service struct {
 	eventDispatcher        event.Dispatcher
 }
 
-func (s service) StartConversation(userIDs []uuid.UUID) (uuid.UUID, error) {
-	existingConversation, err := s.conversationRepository.GetUsersConversation(userIDs)
+func (s service) StartUserConversation(userID, target uuid.UUID) (uuid.UUID, error) {
+	existingConversation, err := s.conversationRepository.GetUserConversation(userID, target)
 	if err != nil {
 		return uuid.Nil, errors.WithStack(err)
 	}
 	if existingConversation != nil {
 		return existingConversation.ID, nil
 	}
+	userIDs := []uuid.UUID{userID, target}
 	conversation := Conversation{
 		ID:      s.conversationRepository.NewID(),
 		UserIDs: userIDs,

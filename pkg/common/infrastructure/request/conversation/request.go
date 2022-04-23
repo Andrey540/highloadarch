@@ -10,8 +10,9 @@ const (
 	GetConversationURL   = urlPrefix + "/api/v1/{id}"
 )
 
-type StartConversation struct {
-	Users []string `json:"users"`
+type StartUserConversation struct {
+	User   string `json:"user"`
+	Target string `json:"target"`
 }
 
 type AddMessage struct {
