@@ -26,6 +26,7 @@ type transport struct {
 	conn                  *amqp.Connection
 	writeChannel          *amqp.Channel
 	handler               event.Handler
+	errorLogger           *stdlog.Logger
 	queueName             string
 	suppressEventsReading bool
 }
@@ -86,6 +87,7 @@ func (t *transport) connectReadChannel(err error, channel *amqp.Channel) error {
 			if err == nil {
 				err = msg.Ack(false)
 			} else {
+				t.errorLogger.Println(err)
 				err = msg.Nack(false, true)
 			}
 			_ = err
@@ -99,14 +101,14 @@ func (t *transport) SetHandler(handler event.Handler) {
 	t.handler = handler
 }
 
-func NewEventTransport(queueName string, suppressEventsReading bool) Transport {
-	return &transport{queueName: queueName, suppressEventsReading: suppressEventsReading}
+func NewEventTransport(queueName string, errorLogger *stdlog.Logger, suppressEventsReading bool) Transport {
+	return &transport{queueName: queueName, errorLogger: errorLogger, suppressEventsReading: suppressEventsReading}
 }
 
 func CreateTransport(cnf Config, logger, errorLogger *stdlog.Logger) (app.Transport, event.Connection, error) {
 	amqpConnection := NewAMQPConnection(&cnf, logger, errorLogger)
 
-	integrationEventTransport := NewEventTransport(cnf.QueueName, false)
+	integrationEventTransport := NewEventTransport(cnf.QueueName, errorLogger, false)
 	amqpConnection.AddChannel(integrationEventTransport)
 
 	err := amqpConnection.Start()

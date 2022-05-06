@@ -10,6 +10,7 @@ import (
 	"time"
 
 	commonapp "github.com/callicoder/go-docker/pkg/common/app"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/event"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/metrics"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
@@ -81,13 +82,35 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 
 	mysqlClient := masterConnector.TransactionalClient()
 	commonUnitOfWorkFactory := infrastructure.NewUnitOfWorkFactory(mysqlClient)
+	transports, connections, err1 := server.InitEventTransport(nil, cnf.amqpConf(), logger, errorLogger)
 
-	transports := []commonapp.Transport{}
+	if err1 != nil {
+		errorLogger.Println(err1)
+		return err1
+	}
+
 	eventDispatcher := commonapp.NewStoredEventDispatcher(commonUnitOfWorkFactory, transports, eventDispatcherErrorsCh)
 	unitOfWorkFactory := infrastructure.NewNotifyingUnitOfWorkFactory(commonUnitOfWorkFactory, eventDispatcher.Activate)
 
 	commandHandlerFactory := command.NewCommandHandlerFactory()
 	commandsHandler := commonapp.NewCommandsHandler(unitOfWorkFactory, commandHandlerFactory)
+
+	handlerFactory := app.NewEventHandlerFactory()
+	eventsHandler := event.NewEventsHandler(unitOfWorkFactory, handlerFactory, logger, errorLogger)
+
+	for _, transport := range transports {
+		transport.(event.Transport).SetHandler(eventsHandler)
+	}
+
+	defer func() {
+		for _, connection := range connections {
+			// noinspection GoUnhandledErrorResult
+			connection.Stop() // nolint:errcheck
+		}
+	}()
+
+	eventDispatcher.Start()
+	defer eventDispatcher.Stop()
 
 	userQueryService := infrastructure.NewUserQueryService(slaveConnector.TransactionalClient())
 

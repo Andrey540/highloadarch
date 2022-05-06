@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	UserIDHeader   = "X-UserID"
+	UserIDHeader   = "X-AuthorID"
 	userRoleHeader = "X-Role"
 	Customer       = "customer"
 	Admin          = "admin"

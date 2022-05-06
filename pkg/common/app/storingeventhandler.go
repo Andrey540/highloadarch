@@ -9,8 +9,14 @@ type storingEventHandler struct {
 	serializer Serializer
 }
 
-func (h *storingEventHandler) Handle(_ event.Event) error {
-	return nil
+func (h *storingEventHandler) Handle(e event.Event) error {
+	msg, err := h.serializer.Serialize(e)
+	if err != nil {
+		return err
+	}
+
+	storedEvent := NewStoredEvent(h.eventStore.NewUID(), e.EventType(), msg)
+	return h.eventStore.Store(storedEvent)
 }
 
 func NewStoringHandler(eventStore EventStore, serializer Serializer) event.Handler {

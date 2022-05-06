@@ -38,7 +38,44 @@ func (s *serializer) Deserialize(eventType, msg string) (result event.Event, err
 	if err != nil {
 		return nil, err
 	}
-	return nil, errors.New("Undefined event type " + eventType)
+	result = nil
+	switch t := eventType; t {
+	case event.UserCreatedEvent:
+		currentEvent := event.UserCreated{}
+		err = json.Unmarshal(body.Payload, &currentEvent)
+		result = currentEvent
+	case event.UserUpdatedEvent:
+		currentEvent := event.UserUpdated{}
+		err = json.Unmarshal(body.Payload, &currentEvent)
+		result = currentEvent
+	case event.UserRemovedEvent:
+		currentEvent := event.UserRemoved{}
+		err = json.Unmarshal(body.Payload, &currentEvent)
+		result = currentEvent
+	case event.UserFriendAddedEvent:
+		currentEvent := event.UserFriendAdded{}
+		err = json.Unmarshal(body.Payload, &currentEvent)
+		result = currentEvent
+	case event.UserFriendRemovedEvent:
+		currentEvent := event.UserFriendRemoved{}
+		err = json.Unmarshal(body.Payload, &currentEvent)
+		result = currentEvent
+	case event.ConversationCreatedEvent:
+		currentEvent := event.ConversationCreated{}
+		err = json.Unmarshal(body.Payload, &currentEvent)
+		result = currentEvent
+	case event.MessageAddedEvent:
+		currentEvent := event.MessageAdded{}
+		err = json.Unmarshal(body.Payload, &currentEvent)
+		result = currentEvent
+	case event.PostCreatedEvent:
+		currentEvent := event.PostCreated{}
+		err = json.Unmarshal(body.Payload, &currentEvent)
+		result = currentEvent
+	default:
+		return nil, errors.New("Undefined event type " + eventType)
+	}
+	return result, err
 }
 
 func NewSerializer() Serializer {

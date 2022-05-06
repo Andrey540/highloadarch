@@ -1,0 +1,75 @@
+{{template "authorizedLayout" .}}
+
+{{define "title"}}Posts{{end}}
+
+{{define "main"}}
+<div class="row">
+    <h2>
+        Posts
+    </h2>
+</div>
+<div class="posts" id="posts">
+    {{range .Posts}}
+    <div class="row">
+        <span id="{{.ID}}" class="title">Title: {{.Title}}</span>
+        <div class="text">Text: {{.Text}}</div>
+    </div>
+    {{end}}
+</div>
+
+<div class="row">
+    <form name="addPost" id="addPostForm" action="" method="POST">
+        <div class="form-group">
+            <label for="title">Title</label>
+            <input type="text" class="form-control" id="title" placeholder="Title" name="title"/>
+        </div>
+        <div class="form-group">
+            <label for="post">Text</label>
+            <textarea class="form-control" id="post" placeholder="Text" name="text"></textarea>
+        </div>
+        <button type="submit" class="btn btn-default">Add Post</button>
+    </form>
+</div>
+{{end}}
+{{define "script"}}
+<script type="text/javascript">
+    let form = document.getElementById('addPostForm');
+    form.onsubmit = function () {
+        let xhr = new XMLHttpRequest();
+        let formData = new FormData(form);
+        //open the request
+        xhr.open('POST', '/post/api/v1/post');
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        let title = formData.get('title');
+        let text = formData.get('text');
+        let data = {
+            title: title,
+            text: text,
+        };
+
+        //send the form data
+        xhr.send(JSON.stringify(data));
+
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    let response = JSON.parse(xhr.response)
+                    let postId = response.post_id;
+                    var div = document.createElement('div');
+                    div.setAttribute('class', 'row');
+                    div.innerHTML = `
+                        <span id="` + postId + `" class="title">Title: ` + title + `</span>
+                        <div class="text">Text: ` + text + `</div>
+                    `;
+                    document.getElementById('posts').appendChild(div);
+                } else {
+                    alert(xhr.response);
+                }
+            }
+        }
+        //Fail the onsubmit to avoid page refresh.
+        return false;
+    }
+</script>
+{{end}}

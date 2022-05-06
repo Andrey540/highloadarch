@@ -24,4 +24,5 @@ type config struct {
 	ServeRESTAddress       string `envconfig:"serve_rest_address" default:":80"`
 	UserServiceURL         string `envconfig:"user_service_url" default:"http://user:80"`
 	ConversationServiceURL string `envconfig:"conversation_service_url" default:"http://conversation:80"`
+	PostServiceURL         string `envconfig:"post_service_url" default:"http://post:80"`
 }

@@ -13,8 +13,8 @@ type processedEventStore struct {
 
 func (store *processedEventStore) Store(processedEvent app.ProcessedEvent) error {
 	const query = `INSERT INTO processed_event (id) VALUES (?);`
-	_, err := store.client.Exec(query, processedEvent.ID)
-	return err
+	_, err := store.client.Exec(query, commonsql.BinaryUUID(processedEvent.ID))
+	return errors.WithStack(err)
 }
 
 func (store *processedEventStore) GetEvent(id uuid.UUID) (*app.ProcessedEvent, error) {

@@ -16,8 +16,11 @@ func parseEnv() (*config, error) {
 }
 
 type config struct {
-	DBMasterHost         string `envconfig:"db_master_host"`
-	DBSlaveHost          string `envconfig:"db_slave_host"`
+	RedisHost     string `envconfig:"redis_host" default:"localhost"`
+	RedisPort     string `envconfig:"redis_port"  default:"6379"`
+	RedisPassword string `envconfig:"redis_password" default:""`
+
+	DBHost               string `envconfig:"db_host"`
 	DBName               string `envconfig:"db_name"`
 	DBUser               string `envconfig:"db_user"`
 	DBPassword           string `envconfig:"db_password"`
@@ -31,22 +34,13 @@ type config struct {
 
 	MigrationsDir string `envconfig:"migrations_dir"`
 
-	ServiceHost      string `envconfig:"service_host" default:"http://socialnetwork:80"`
+	ServiceHost      string `envconfig:"service_host" default:"http://post:80"`
 	ServeRESTAddress string `envconfig:"serve_rest_address" default:":80"`
 }
 
-func (c *config) masterDSN() mysql.DSN {
+func (c *config) dsn() mysql.DSN {
 	return mysql.DSN{
-		Host:     c.DBMasterHost,
-		Database: c.DBName,
-		User:     c.DBUser,
-		Password: c.DBPassword,
-	}
-}
-
-func (c *config) slaveDSN() mysql.DSN {
-	return mysql.DSN{
-		Host:     c.DBSlaveHost,
+		Host:     c.DBHost,
 		Database: c.DBName,
 		User:     c.DBUser,
 		Password: c.DBPassword,

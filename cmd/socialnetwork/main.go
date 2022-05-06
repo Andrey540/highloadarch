@@ -17,10 +17,12 @@ import (
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/response"
 	conversationresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/conversation"
+	postresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/post"
 	userresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/user"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/server"
 	"github.com/callicoder/go-docker/pkg/socialnetwork/inrastructure"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -58,10 +60,35 @@ type MessageData struct {
 	Text     string
 }
 
+type PostData struct {
+	ID     string
+	Author string
+	Title  string
+	Text   string
+}
+
+type NewPostData struct {
+	ID     string
+	Author string
+	Title  string
+}
+
 type ConversationPage struct { // nolint: maligned
 	ID       string
 	UserName string
 	Messages []MessageData
+}
+
+type MyPostsPage struct { // nolint: maligned
+	Posts []PostData
+}
+
+type NewPostsPage struct { // nolint: maligned
+	Posts []NewPostData
+}
+
+type PostPage struct { // nolint: maligned
+	Post PostData
 }
 
 func main() {
@@ -96,6 +123,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	wrappedClient := httpclient.NewHTTPClient(httpClient)
 	userService := inrastructure.NewUserService(cnf.UserServiceURL, wrappedClient)
 	conversationService := inrastructure.NewConversationService(cnf.ConversationServiceURL, wrappedClient)
+	postService := inrastructure.NewPostService(cnf.PostServiceURL, wrappedClient)
 
 	sessionService, err := redis.NewSessionService(&redis.Config{
 		Password: cnf.RedisPassword,
@@ -110,12 +138,12 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	stopChan := make(chan struct{})
 	server.ListenOSKillSignals(stopChan)
 	serverHub := server.NewHub(stopChan)
-	serveHTTP(cnf, serverHub, userService, conversationService, sessionService, logger, errorLogger, metricsHandler)
+	serveHTTP(cnf, serverHub, userService, conversationService, postService, sessionService, logger, errorLogger, metricsHandler)
 
 	return serverHub.Wait()
 }
 
-func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.UserService, conversationService inrastructure.ConversationService,
+func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.UserService, conversationService inrastructure.ConversationService, postService inrastructure.PostService,
 	sessionService redis.SessionService, logger, errorLogger *stdlog.Logger, metricsHandler metrics.PrometheusMetricsHandler) {
 	ctx := context.Background()
 	_, cancel := context.WithCancel(ctx)
@@ -134,6 +162,9 @@ func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.
 		signInTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/login.page.html")...))
 		listUsersTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/user_list.page.html")...))
 		conversationTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/conversation.page.html")...))
+		myPostsTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/my_posts.page.html")...))
+		newPostsTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/new_posts.page.html")...))
+		postTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/post.page.html")...))
 
 		router.HandleFunc(signInURL, authUser(userService, sessionService)).Methods(http.MethodPost)
 		router.HandleFunc("/api/v1/signout", logoutUser(sessionService)).Methods(http.MethodPost)
@@ -146,9 +177,13 @@ func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.
 		router.HandleFunc("/app/logout", logoutUserWithRedirect(sessionService)).Methods(http.MethodGet)
 		router.HandleFunc("/app/user/list", listUsers(userService, listUsersTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/conversation/user/{id}", getConversation(userService, conversationService, conversationTpl)).Methods(http.MethodGet)
+		router.HandleFunc("/app/post/list", getMyPosts(postService, myPostsTpl)).Methods(http.MethodGet)
+		router.HandleFunc("/app/post/news", getNewPosts(postService, userService, newPostsTpl)).Methods(http.MethodGet)
+		router.HandleFunc("/app/post/{id}", getPost(postService, userService, postTpl)).Methods(http.MethodGet)
 
 		router.PathPrefix("/user/api/").HandlerFunc(proxyRequest(config.UserServiceURL))
 		router.PathPrefix("/conversation/api/").HandlerFunc(proxyRequest(config.ConversationServiceURL))
+		router.PathPrefix("/post/api/").HandlerFunc(proxyRequest(config.PostServiceURL))
 
 		nextRequestID := func() string {
 			return fmt.Sprintf("%d", time.Now().UnixNano())
@@ -398,6 +433,87 @@ func getConversation(userService inrastructure.UserService, conversationService 
 	}
 }
 
+func getMyPosts(postService inrastructure.PostService, tpl *template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		posts, err := postService.ListPosts(r)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		postsData, err := getPosts(posts)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		page := MyPostsPage{Posts: postsData}
+		err = tpl.Execute(w, page)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+	}
+}
+
+func getNewPosts(postService inrastructure.PostService, userService inrastructure.UserService, tpl *template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		posts, err := postService.ListNews(r)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		var userIDs []string
+		for _, post := range posts {
+			userIDs = append(userIDs, post.AuthorID)
+		}
+		usersMap, err := getUsersMap(r, userService, userIDs)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		postsData, err := getNews(usersMap, posts)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		page := NewPostsPage{Posts: postsData}
+		err = tpl.Execute(w, page)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+	}
+}
+
+func getPost(postService inrastructure.PostService, userService inrastructure.UserService, tpl *template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		post, err := postService.GetPost(r)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		usersMap, err := getUsersMap(r, userService, []string{post.AuthorID})
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		if _, found := usersMap[post.AuthorID]; !found {
+			response.WriteNotFoundResponse(errors.New("User not found"), w)
+			return
+		}
+		user := usersMap[post.AuthorID]
+		data := PostData{ID: post.ID, Author: user.Username, Title: post.Title, Text: post.Text}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		page := PostPage{Post: data}
+		err = tpl.Execute(w, page)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+	}
+}
+
 func listUserResponse(user userresponse.ListItemDTO) ListUserItem {
 	return ListUserItem{
 		ID:       user.ID,
@@ -455,6 +571,24 @@ func getMessages(usersMap map[string]userresponse.ListItemDTO, messages []conver
 	for _, message := range messages {
 		if user, found := usersMap[message.UserID]; found {
 			result = append(result, MessageData{ID: message.ID, UserName: user.Username, Text: message.Text})
+		}
+	}
+	return result, nil
+}
+
+func getPosts(posts []postresponse.Data) ([]PostData, error) {
+	result := []PostData{}
+	for _, post := range posts {
+		result = append(result, PostData{ID: post.ID, Title: post.Title, Text: post.Text})
+	}
+	return result, nil
+}
+
+func getNews(usersMap map[string]userresponse.ListItemDTO, posts []postresponse.NewsListItem) ([]NewPostData, error) {
+	var result []NewPostData
+	for _, post := range posts {
+		if user, found := usersMap[post.AuthorID]; found {
+			result = append(result, NewPostData{ID: post.ID, Author: user.Username, Title: post.Title})
 		}
 	}
 	return result, nil

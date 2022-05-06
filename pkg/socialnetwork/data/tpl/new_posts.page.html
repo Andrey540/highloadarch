@@ -1,0 +1,31 @@
+{{template "authorizedLayout" .}}
+
+{{define "title"}}New Posts{{end}}
+
+{{define "main"}}
+<div class="row">
+    <h2>
+        New Posts
+    </h2>
+</div>
+<div class="posts">
+    {{range .Posts}}
+    <div class="row post" id="{{.ID}}">
+        <div class="author">Author: {{.Author}}</div>
+        <div class="title">Title: {{.Title}}</div>
+    </div>
+    {{end}}
+</div>
+
+{{end}}
+{{define "script"}}
+<script type="text/javascript">
+    let posts = document.getElementsByClassName('post');
+    for (let i = 0; i < posts.length; i++) {
+        posts[i].addEventListener('click', function () {
+            window.location.href = '/app/post/' + this.id
+            return false;
+        }, false);
+    }
+</script>
+{{end}}

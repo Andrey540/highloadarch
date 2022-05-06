@@ -19,7 +19,7 @@ func (store *eventStore) NewUID() uuid.UUID {
 func (store *eventStore) Store(storedEvent app.StoredEvent) error {
 	const query = `INSERT INTO stored_event (id, status, type, body) VALUES (?, ?, ?, ?)
                    ON DUPLICATE KEY UPDATE status=VALUES(status);`
-	_, err := store.client.Exec(query, storedEvent.ID, storedEvent.Status, storedEvent.Type, storedEvent.Body)
+	_, err := store.client.Exec(query, sql.BinaryUUID(storedEvent.ID), storedEvent.Status, storedEvent.Type, storedEvent.Body)
 	return err
 }
 

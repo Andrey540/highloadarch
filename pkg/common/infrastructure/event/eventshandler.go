@@ -7,6 +7,7 @@ import (
 
 	"github.com/callicoder/go-docker/pkg/common/app"
 	"github.com/callicoder/go-docker/pkg/common/uuid"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -31,7 +32,7 @@ func (handler *handler) Handle(msg string) error {
 	err := json.Unmarshal([]byte(msg), &storedEvent)
 	if err != nil {
 		handler.errorLogger.Println(err)
-		return err
+		return errors.WithStack(err)
 	}
 	lockID := ""
 	if storedEvent.ID != uuid.Nil {
@@ -43,7 +44,7 @@ func (handler *handler) Handle(msg string) error {
 		processedEvent, err := processedEventStore.GetEvent(storedEvent.ID)
 		if err != nil {
 			handler.errorLogger.Println(err)
-			return err
+			return errors.WithStack(err)
 		}
 		if processedEvent != nil {
 			handler.logger.Println("Event already processed")
@@ -52,25 +53,26 @@ func (handler *handler) Handle(msg string) error {
 		domainEvent, err := handler.serializer.Deserialize(storedEvent.Type, storedEvent.Body)
 		if err != nil {
 			handler.errorLogger.Println(err)
-			return err
+			return errors.WithStack(err)
 		}
 		eventHandler, err := handler.eventHandlerFactory.CreateHandler(unitOfWork, storedEvent.Type)
 		if err != nil {
 			handler.errorLogger.Println(err)
-			return err
+			return errors.WithStack(err)
 		}
 		if eventHandler != nil {
 			err = eventHandler.Handle(domainEvent)
 			if err != nil {
 				handler.errorLogger.Println(err)
-				return err
+				return errors.WithStack(err)
 			}
 			handler.logger.Println("Event processed")
 		} else {
 			handler.logger.Println("Event skipped")
 		}
 
-		return processedEventStore.Store(app.NewProcessedEvent(storedEvent.ID))
+		err = processedEventStore.Store(app.NewProcessedEvent(storedEvent.ID))
+		return errors.WithStack(err)
 	}, lockName)
 }
 

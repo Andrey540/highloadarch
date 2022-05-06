@@ -5,6 +5,7 @@
 APP_CMD_NAMES = \
 	socialnetwork \
 	conversation \
+	post \
 	user
 
 # Contains common make targets, including 'build', 'test' and 'check'

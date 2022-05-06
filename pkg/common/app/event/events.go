@@ -9,8 +9,13 @@ const (
 	UserUpdatedEvent = "user.user_updated"
 	UserRemovedEvent = "user.user_removed"
 
+	UserFriendAddedEvent   = "user.friend_added"
+	UserFriendRemovedEvent = "user.friend_removed"
+
 	ConversationCreatedEvent = "conversation.created"
 	MessageAddedEvent        = "conversation.message_added"
+
+	PostCreatedEvent = "post.created"
 )
 
 type UserCreated struct {
@@ -39,6 +44,24 @@ func (event UserRemoved) EventType() string {
 	return UserRemovedEvent
 }
 
+type UserFriendAdded struct {
+	UserID   string `json:"user_id"`
+	FriendID string `json:"friend_id"`
+}
+
+func (event UserFriendAdded) EventType() string {
+	return UserFriendAddedEvent
+}
+
+type UserFriendRemoved struct {
+	UserID   string `json:"user_id"`
+	FriendID string `json:"friend_id"`
+}
+
+func (event UserFriendRemoved) EventType() string {
+	return UserFriendRemovedEvent
+}
+
 type ConversationCreated struct {
 	ConversationID string   `json:"conversation_id"`
 	UserIDs        []string `json:"user_ids"`
@@ -57,4 +80,15 @@ type MessageAdded struct {
 
 func (event MessageAdded) EventType() string {
 	return MessageAddedEvent
+}
+
+type PostCreated struct {
+	PostID   string `json:"post_id"`
+	AuthorID string `json:"author_id"`
+	Title    string `json:"title"`
+	Text     string `json:"text"`
+}
+
+func (event PostCreated) EventType() string {
+	return PostCreatedEvent
 }

@@ -152,7 +152,12 @@ func (s service) AddUserFriend(userID, friendID uuid.UUID) error {
 		UserID:   userID,
 		FriendID: friendID,
 	}
-	return s.userFriendRepository.AddFriend(&userFriend)
+	err := s.userFriendRepository.AddFriend(&userFriend)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	err = s.eventDispatcher.Dispatch(event.UserFriendAdded{UserID: userID.String(), FriendID: friendID.String()})
+	return errors.WithStack(err)
 }
 
 func (s service) RemoveUserFriend(userID, friendID uuid.UUID) error {
@@ -160,7 +165,12 @@ func (s service) RemoveUserFriend(userID, friendID uuid.UUID) error {
 		UserID:   userID,
 		FriendID: friendID,
 	}
-	return s.userFriendRepository.RemoveFriend(&userFriend)
+	err := s.userFriendRepository.RemoveFriend(&userFriend)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	err = s.eventDispatcher.Dispatch(event.UserFriendRemoved{UserID: userID.String(), FriendID: friendID.String()})
+	return errors.WithStack(err)
 }
 
 func NewUserService(userRepository UserRepository, userFriendRepository UserFriendRepository, eventDispatcher event.Dispatcher) UserService {
