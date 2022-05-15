@@ -21,7 +21,7 @@ services:
       retries: 20
     volumes:
       - "socialnetwork-db-data-1:/var/lib/mysql"
-      - "${PWD}/data/mysql/config/:/etc/my.cnf.d"
+      - "${PWD}/data/mysql/config/common/:/etc/my.cnf.d"
 
   mysql-node-2:
     image: percona/percona-server:8.0
@@ -40,7 +40,7 @@ services:
       retries: 20
     volumes:
       - "socialnetwork-db-data-2:/var/lib/mysql"
-      - "${PWD}/data/mysql/config/:/etc/my.cnf.d"
+      - "${PWD}/data/mysql/config/common/:/etc/my.cnf.d"
     depends_on:
       - mysql-node-1
 
@@ -61,12 +61,12 @@ services:
       retries: 20
     volumes:
       - "socialnetwork-db-data-3:/var/lib/mysql"
-      - "${PWD}/data/mysql/config/:/etc/my.cnf.d"
+      - "${PWD}/data/mysql/config/common/:/etc/my.cnf.d"
     depends_on:
       - mysql-node-1
 
   mysql-post:
-    image: percona/percona-server:8.0
+    image: mysql:5.7
     container_name: mysql-post
     hostname: mysql-post
     ports:
@@ -80,6 +80,7 @@ services:
     command: [ "mysqld" ]
     volumes:
       - "socialnetwork-db-post-data:/var/lib/mysql"
+      - "${PWD}/data/mysql/config/post/:/etc/mysql/conf.d"
     healthcheck:
       test: "mysqladmin ping -u root -p$${MYSQL_ROOT_PASSWORD}"
       interval: 2s
@@ -98,8 +99,28 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
 
+  tarantool:
+    image: tarantool/tarantool:latest
+    container_name: tarantool
+    command: [ "tarantool", "/opt/tarantool/tarantool.lua" ]
+    ports:
+      - "3301:3301"
+    volumes:
+      - "socialnetwork-db-tarantool:/var/lib/tarantool"
+      - "${PWD}/tarantool/lua:/opt/tarantool"
+
+  tarantool-replicator:
+    image: andrey540/mysql-tarantool-replication
+    container_name: tarantool-replicator
+    privileged: true
+    volumes:
+      - "${PWD}/tarantool/config/:/usr/local/etc/replicatord"
+    depends_on:
+      - mysql-post
+      - tarantool
+
   socialnetwork:
-    image: "andrey540/socialnetwork:v5"
+    image: "andrey540/socialnetwork:v6"
     container_name: socialnetwork
     ports:
       - "8881:8001"
@@ -117,7 +138,7 @@ services:
       - redis
 
   user:
-    image: "andrey540/user:v5"
+    image: "andrey540/user:v6"
     container_name: user
     ports:
       - "8882:8002"
@@ -140,7 +161,7 @@ services:
       - mysql-node-3
 
   conversation:
-    image: "andrey540/conversation:v5"
+    image: "andrey540/conversation:v6"
     container_name: conversation
     ports:
       - "8883:8003"
@@ -166,12 +187,14 @@ services:
       - vtctld
 
   post:
-    image: "andrey540/post:v5"
+    image: "andrey540/post:v6"
     container_name: post
     ports:
       - "8884:8004"
     environment:
       REDIS_HOST: redis
+      TARANTOOL_HOST: tarantool
+      TARANTOOL_PORT: 3301
       DB_HOST: mysql-post
       DB_NAME: post
       DB_USER: socialnetwork
@@ -413,3 +436,4 @@ volumes:
   socialnetwork-db-data-2:
   socialnetwork-db-data-3:
   socialnetwork-db-post-data:
+  socialnetwork-db-tarantool:

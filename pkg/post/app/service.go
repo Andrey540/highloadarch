@@ -16,6 +16,7 @@ type Post struct {
 type NewPost struct {
 	ID       uuid.UUID
 	AuthorID uuid.UUID
+	Title    string
 }
 
 type UserFriend struct {
@@ -47,7 +48,7 @@ type NewsLineCache interface {
 
 type PostService interface {
 	CreatePost(authorID uuid.UUID, title, text string) (uuid.UUID, error)
-	AddNewPost(postID, authorID uuid.UUID) error
+	AddNewPost(postID, authorID uuid.UUID, title string) error
 }
 
 type UserService interface {
@@ -80,8 +81,8 @@ func (s postService) CreatePost(authorID uuid.UUID, title, text string) (uuid.UU
 	return id, nil
 }
 
-func (s postService) AddNewPost(postID, authorID uuid.UUID) error {
-	return s.newsLineStore.AddNewPost(NewPost{ID: postID, AuthorID: authorID})
+func (s postService) AddNewPost(postID, authorID uuid.UUID, title string) error {
+	return s.newsLineStore.AddNewPost(NewPost{ID: postID, AuthorID: authorID, Title: title})
 }
 
 func NewPostService(postRepository PostRepository, newsLineStore NewsLineStore, eventDispatcher event.Dispatcher) PostService {

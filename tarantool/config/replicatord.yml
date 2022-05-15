@@ -1,0 +1,20 @@
+mysql:
+  host: mysql-post
+  port: 3306
+  user: root
+  password: ""
+  connect_retry: 15 # seconds
+
+tarantool:
+  host: tarantool:3301
+  binlog_pos_space: 512
+  binlog_pos_key: 0
+  connect_retry: 15 # seconds
+  sync_retry: 1000 # milliseconds
+
+mappings:
+  - database: post
+    table: news_line
+    columns: [ id, user_id, post_id, author_id, title ]
+    space: 513
+    key_fields: [ 0 ]

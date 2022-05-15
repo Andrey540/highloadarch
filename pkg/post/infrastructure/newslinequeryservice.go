@@ -2,18 +2,30 @@ package infrastructure
 
 import (
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/tarantool"
 	"github.com/callicoder/go-docker/pkg/common/uuid"
 	"github.com/callicoder/go-docker/pkg/post/app"
 	"github.com/pkg/errors"
 )
 
+const maxNewsCount = 1000
+
 type newsLineQueryService struct {
-	client        mysql.Client
-	newsLineCache NewsLineCache
+	client          mysql.Client
+	newsLineCache   NewsLineCache
+	tarantoolClient tarantool.Client
+}
+
+type newsLineItem struct {
+	ID       int
+	UserID   string
+	PostID   string
+	AuthorID string
+	Title    string
 }
 
 func (s newsLineQueryService) ListPosts(userID uuid.UUID) ([]*app.PostDTO, error) {
-	const sqlQuery = `SELECT id, author_id, title, text FROM post WHERE author_id=?`
+	const sqlQuery = `SELECT id, author_id, title, text FROM post WHERE author_id=? ORDER BY created_at LIMIT 1000`
 	rows, err := s.client.Query(sqlQuery, mysql.BinaryUUID(userID))
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -35,15 +47,26 @@ func (s newsLineQueryService) ListPosts(userID uuid.UUID) ([]*app.PostDTO, error
 }
 
 func (s newsLineQueryService) ListNews(userID uuid.UUID) (*[]app.NewsLineItem, error) {
-	news, err := s.newsLineCache.GetUserNews(userID)
+	return s.listNewsTarantool(userID)
+}
+
+func (s newsLineQueryService) listNewsTarantool(userID uuid.UUID) (*[]app.NewsLineItem, error) {
+	var newsItems []newsLineItem
+	err := s.tarantoolClient.Select("mysqldata", "user_idx", 0, maxNewsCount, userID.String(), &newsItems)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
-	if news != nil {
-		return news, nil
+	result := []app.NewsLineItem{}
+	for _, news := range newsItems {
+		result = append(result, app.NewsLineItem{ID: news.PostID, Author: news.AuthorID, Title: news.Title})
 	}
-	const sqlQuery = `SELECT p.id, p.author_id, p.title FROM post p INNER JOIN news_line nl ON nl.post_id = p.id WHERE nl.user_id=?`
-	rows, err := s.client.Query(sqlQuery, mysql.BinaryUUID(userID))
+	return &result, err
+}
+
+// nolint: unused
+func (s newsLineQueryService) listNewsSQL(userID uuid.UUID) (*[]app.NewsLineItem, error) {
+	const sqlQuery = `SELECT post_id, author_id, title FROM news_line WHERE user_id=? ORDER BY id DESC LIMIT ?`
+	rows, err := s.client.Query(sqlQuery, userID.String(), maxNewsCount)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -60,7 +83,7 @@ func (s newsLineQueryService) ListNews(userID uuid.UUID) (*[]app.NewsLineItem, e
 		result = append(result, post)
 	}
 	defer rows.Close()
-	return &result, s.newsLineCache.SaveUserNews(userID, &result)
+	return &result, nil
 }
 
 func (s newsLineQueryService) GetPost(postID uuid.UUID) (*app.PostDTO, error) {
@@ -84,9 +107,10 @@ func (s newsLineQueryService) GetPost(postID uuid.UUID) (*app.PostDTO, error) {
 	return &post, nil
 }
 
-func NewNewsLineQueryService(client mysql.Client, newsLineCache NewsLineCache) app.NewsLineQueryService {
+func NewNewsLineQueryService(client mysql.Client, newsLineCache NewsLineCache, tarantoolClient tarantool.Client) app.NewsLineQueryService {
 	return &newsLineQueryService{
-		client:        client,
-		newsLineCache: newsLineCache,
+		client:          client,
+		newsLineCache:   newsLineCache,
+		tarantoolClient: tarantoolClient,
 	}
 }

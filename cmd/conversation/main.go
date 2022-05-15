@@ -51,11 +51,6 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	}
 
 	connector := vitess.NewConnector()
-	/*err = connector.MigrateUp(cnf.dbDsn(), cnf.MigrationsDir, cnf.DBName)
-	if err != nil {
-		errorLogger.Println(err)
-		return err
-	}*/
 	schemaLoader := vitess.NewSchemaLoader(logger)
 	err = schemaLoader.Migrate(cnf.schemaDsn(), cnf.VSchemaPath, cnf.DBName)
 	if err != nil {

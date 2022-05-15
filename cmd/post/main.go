@@ -18,6 +18,7 @@ import (
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/response"
 	postresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/post"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/server"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/tarantool"
 	"github.com/callicoder/go-docker/pkg/common/uuid"
 	"github.com/callicoder/go-docker/pkg/post/app"
 	"github.com/callicoder/go-docker/pkg/post/app/command"
@@ -62,6 +63,15 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	}
 	// noinspection GoUnhandledErrorResult
 	defer connector.Close()
+
+	tarantoolClient := tarantool.NewClient(cnf.tarantoolConf())
+	err = tarantoolClient.Open()
+	if err != nil {
+		errorLogger.Println(err)
+		return err
+	}
+	// noinspection GoUnhandledErrorResult
+	defer tarantoolClient.Close()
 
 	eventDispatcherErrorsCh := make(chan error)
 	go func() {
@@ -113,7 +123,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	eventDispatcher.Start()
 	defer eventDispatcher.Stop()
 
-	newsLineQueryService := infrastructure.NewNewsLineQueryService(connector.TransactionalClient(), *newsLineCache)
+	newsLineQueryService := infrastructure.NewNewsLineQueryService(connector.TransactionalClient(), *newsLineCache, tarantoolClient)
 
 	stopChan := make(chan struct{})
 	server.ListenOSKillSignals(stopChan)
@@ -232,7 +242,7 @@ func listNews(service app.NewsLineQueryService) http.HandlerFunc {
 		}
 		result := []postresponse.NewsListItem{}
 		for _, post := range *posts {
-			result = append(result, postresponse.NewsListItem{ID: post.ID.String(), AuthorID: post.Author.String(), Title: post.Title})
+			result = append(result, postresponse.NewsListItem{ID: post.ID, AuthorID: post.Author, Title: post.Title})
 		}
 		data, err := json.Marshal(result)
 		if err != nil {

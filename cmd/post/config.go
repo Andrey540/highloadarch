@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/amqp"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/tarantool"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 )
@@ -19,6 +20,11 @@ type config struct {
 	RedisHost     string `envconfig:"redis_host" default:"localhost"`
 	RedisPort     string `envconfig:"redis_port"  default:"6379"`
 	RedisPassword string `envconfig:"redis_password" default:""`
+
+	TarantoolHost     string `envconfig:"tarantool_host" default:"tarantool"`
+	TarantoolPort     string `envconfig:"tarantool_port"  default:"3301"`
+	TarantoolUser     string `envconfig:"tarantool_user" default:"guest"`
+	TarantoolPassword string `envconfig:"tarantool_password" default:""`
 
 	DBHost               string `envconfig:"db_host"`
 	DBName               string `envconfig:"db_name"`
@@ -56,5 +62,14 @@ func (c *config) amqpConf() *amqp.Config {
 		User:      c.AMQPUser,
 		Password:  c.AMQPPassword,
 		QueueName: appID,
+	}
+}
+
+func (c *config) tarantoolConf() *tarantool.Config {
+	return &tarantool.Config{
+		Host:     c.TarantoolHost,
+		Port:     c.TarantoolPort,
+		User:     c.TarantoolUser,
+		Password: c.TarantoolPassword,
 	}
 }

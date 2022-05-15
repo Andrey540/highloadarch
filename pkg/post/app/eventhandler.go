@@ -99,14 +99,12 @@ func (h postCreatedEventHandler) Handle(currentEvent event.Event) error {
 	if err != nil {
 		return err
 	}
-	subscribers, err := h.unitOfWork.UserProvider().ListUserSubscribers(authorID)
 	if err != nil {
 		return err
 	}
-	err = postService.AddNewPost(postID, authorID)
+	err = postService.AddNewPost(postID, authorID, event1.Title)
 	if err != nil {
 		return err
 	}
-	_ = h.newsLineCache.InvalidateUsers(subscribers)
 	return nil
 }

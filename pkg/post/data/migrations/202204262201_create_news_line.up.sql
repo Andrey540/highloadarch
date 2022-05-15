@@ -1,10 +1,11 @@
 CREATE TABLE news_line
 (
     id         INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    user_id    binary(16) NOT NULL,
-    post_id    binary(16) NOT NULL,
-    post_index INT(11) NOT NULL DEFAULT 0,
-    INDEX      `user_post_idx` (`user_id`, `post_index`),
+    user_id    VARCHAR(36) NOT NULL,
+    post_id    VARCHAR(36) NOT NULL,
+    author_id  VARCHAR(36) NOT NULL,
+    title      VARCHAR(255) NOT NULL,
+    INDEX      `user_idx` (`user_id`),
     INDEX      `post_idx` (`post_id`)
 ) ENGINE = InnoDB
     CHARACTER SET = utf8mb4

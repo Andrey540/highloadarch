@@ -20,6 +20,7 @@ require (
 	github.com/segmentio/kafka-go v0.4.30
 	github.com/streadway/amqp v1.0.0
 	github.com/stretchr/testify v1.7.1
+	github.com/tarantool/go-tarantool v0.0.0-20220428190348-de95e3184df6
 	google.golang.org/grpc v1.41.0
 	vitess.io/vitess v0.13.1
 )

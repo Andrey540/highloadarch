@@ -16,3 +16,5 @@ docker exec mysql-node-2 mysql -uroot \
 docker exec mysql-node-3 mysql -uroot \
   -e "change master to master_user='repl' for channel 'group_replication_recovery';" \
   -e "START GROUP_REPLICATION;"
+
+docker exec tarantool-replicator /bin/bash -c "systemctl start replicatord"

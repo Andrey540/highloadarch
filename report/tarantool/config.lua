@@ -1,0 +1,1 @@
+wrk.headers["Cookie"] = "otussid=i6bqHjQ9ncrWh7UyyzKYMB"

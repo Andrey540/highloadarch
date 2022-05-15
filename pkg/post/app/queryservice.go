@@ -5,8 +5,8 @@ import (
 )
 
 type NewsLineItem struct {
-	ID     uuid.UUID
-	Author uuid.UUID
+	ID     string
+	Author string
 	Title  string
 }
 
