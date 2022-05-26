@@ -12,7 +12,6 @@ import (
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/event"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/metrics"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/redis"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
 	postrequest "github.com/callicoder/go-docker/pkg/common/infrastructure/request/post"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/response"
@@ -22,7 +21,7 @@ import (
 	"github.com/callicoder/go-docker/pkg/common/uuid"
 	"github.com/callicoder/go-docker/pkg/post/app"
 	"github.com/callicoder/go-docker/pkg/post/app/command"
-	infrastructure "github.com/callicoder/go-docker/pkg/post/infrastructure"
+	"github.com/callicoder/go-docker/pkg/post/infrastructure"
 	"github.com/gorilla/mux"
 )
 
@@ -80,16 +79,18 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 		}
 	}()
 
-	mysqlClient := connector.TransactionalClient()
-	newsLineCache, err := infrastructure.NewNewsLineCache(&redis.Config{
-		Password: cnf.RedisPassword,
-		Host:     cnf.RedisHost + ":" + cnf.RedisPort,
-	})
+	realtimeHosts, err := cnf.realtimeHosts()
 	if err != nil {
 		return err
 	}
-	// nolint: errcheck
-	defer newsLineCache.Stop()
+	userNotifier, err := infrastructure.NewUserNotifier(realtimeHosts, "post")
+	if err != nil {
+		return err
+	}
+	// noinspection GoUnhandledErrorResult
+	defer userNotifier.Close()
+
+	mysqlClient := connector.TransactionalClient()
 
 	commonUnitOfWorkFactory := infrastructure.NewUnitOfWorkFactory(mysqlClient)
 
@@ -106,7 +107,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	commandHandlerFactory := command.NewCommandHandlerFactory()
 	commandsHandler := commonapp.NewCommandsHandler(unitOfWorkFactory, commandHandlerFactory)
 
-	handlerFactory := app.NewEventHandlerFactory(newsLineCache)
+	handlerFactory := app.NewEventHandlerFactory(userNotifier, errorLogger)
 	eventsHandler := event.NewEventsHandler(unitOfWorkFactory, handlerFactory, logger, errorLogger)
 
 	for _, transport := range transports {
@@ -123,7 +124,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	eventDispatcher.Start()
 	defer eventDispatcher.Stop()
 
-	newsLineQueryService := infrastructure.NewNewsLineQueryService(connector.TransactionalClient(), *newsLineCache, tarantoolClient)
+	newsLineQueryService := infrastructure.NewNewsLineQueryService(connector.TransactionalClient(), tarantoolClient)
 
 	stopChan := make(chan struct{})
 	server.ListenOSKillSignals(stopChan)

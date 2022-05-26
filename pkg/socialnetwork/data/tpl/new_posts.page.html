@@ -1,5 +1,8 @@
 {{template "authorizedLayout" .}}
 
+{{define "header"}}
+<script src="https://cdn.jsdelivr.net/gh/centrifugal/centrifuge-js@2.8.4/dist/centrifuge.min.js"></script>
+{{end}}
 {{define "title"}}New Posts{{end}}
 
 {{define "main"}}
@@ -8,7 +11,9 @@
         New Posts
     </h2>
 </div>
-<div class="posts">
+<input type="hidden" id="realtimeHost" value="{{.RealtimeHost}}">
+<input type="hidden" id="userId" value="{{.UserID}}">
+<div class="posts" id="posts">
     {{range .Posts}}
     <div class="row post" id="{{.ID}}">
         <div class="author">Author: {{.Author}}</div>
@@ -20,6 +25,8 @@
 {{end}}
 {{define "script"}}
 <script type="text/javascript">
+    let realtimeHost = document.getElementById('realtimeHost').value;
+    let userId = document.getElementById('userId').value;
     let posts = document.getElementsByClassName('post');
     for (let i = 0; i < posts.length; i++) {
         posts[i].addEventListener('click', function () {
@@ -27,5 +34,19 @@
             return false;
         }, false);
     }
+
+    const centrifuge = new Centrifuge(realtimeHost);
+    centrifuge.subscribe("post:" + userId, function (ctx) {
+        var div = document.createElement('div');
+        div.setAttribute('class', 'row post');
+        div.setAttribute('id', ctx.data.post_id);
+        div.innerHTML = `
+                        <div class="author">Author: ` + ctx.data.author + `</div>
+                        <div class="title">Title: ` + ctx.data.title + `</div>
+                    `;
+        document.getElementById('posts').appendChild(div);
+    });
+
+    centrifuge.connect();
 </script>
 {{end}}

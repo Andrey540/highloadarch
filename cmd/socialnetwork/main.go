@@ -13,6 +13,7 @@ import (
 
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/httpclient"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/metrics"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/realtime"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/redis"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/response"
@@ -84,7 +85,9 @@ type MyPostsPage struct { // nolint: maligned
 }
 
 type NewPostsPage struct { // nolint: maligned
-	Posts []NewPostData
+	UserID       string
+	Posts        []NewPostData
+	RealtimeHost string
 }
 
 type PostPage struct { // nolint: maligned
@@ -124,6 +127,11 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	userService := inrastructure.NewUserService(cnf.UserServiceURL, wrappedClient)
 	conversationService := inrastructure.NewConversationService(cnf.ConversationServiceURL, wrappedClient)
 	postService := inrastructure.NewPostService(cnf.PostServiceURL, wrappedClient)
+	realtimeHosts, err := cnf.realtimeHosts()
+	if err != nil {
+		return err
+	}
+	realtimeClientService := realtime.NewClientService(realtimeHosts)
 
 	sessionService, err := redis.NewSessionService(&redis.Config{
 		Password: cnf.RedisPassword,
@@ -138,13 +146,13 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	stopChan := make(chan struct{})
 	server.ListenOSKillSignals(stopChan)
 	serverHub := server.NewHub(stopChan)
-	serveHTTP(cnf, serverHub, userService, conversationService, postService, sessionService, logger, errorLogger, metricsHandler)
+	serveHTTP(cnf, serverHub, userService, conversationService, postService, sessionService, realtimeClientService, logger, errorLogger, metricsHandler)
 
 	return serverHub.Wait()
 }
 
 func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.UserService, conversationService inrastructure.ConversationService, postService inrastructure.PostService,
-	sessionService redis.SessionService, logger, errorLogger *stdlog.Logger, metricsHandler metrics.PrometheusMetricsHandler) {
+	sessionService redis.SessionService, realtimeClientService realtime.ClientService, logger, errorLogger *stdlog.Logger, metricsHandler metrics.PrometheusMetricsHandler) {
 	ctx := context.Background()
 	_, cancel := context.WithCancel(ctx)
 	var httpServer *http.Server
@@ -178,7 +186,7 @@ func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.
 		router.HandleFunc("/app/user/list", listUsers(userService, listUsersTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/conversation/user/{id}", getConversation(userService, conversationService, conversationTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/post/list", getMyPosts(postService, myPostsTpl)).Methods(http.MethodGet)
-		router.HandleFunc("/app/post/news", getNewPosts(postService, userService, newPostsTpl)).Methods(http.MethodGet)
+		router.HandleFunc("/app/post/news", getNewPosts(postService, userService, realtimeClientService, newPostsTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/post/{id}", getPost(postService, userService, postTpl)).Methods(http.MethodGet)
 
 		router.PathPrefix("/user/api/").HandlerFunc(proxyRequest(config.UserServiceURL))
@@ -455,8 +463,9 @@ func getMyPosts(postService inrastructure.PostService, tpl *template.Template) h
 	}
 }
 
-func getNewPosts(postService inrastructure.PostService, userService inrastructure.UserService, tpl *template.Template) http.HandlerFunc {
+func getNewPosts(postService inrastructure.PostService, userService inrastructure.UserService, realtimeClientService realtime.ClientService, tpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		loggedUserID := getUserIDFromContext(r)
 		posts, err := postService.ListNews(r)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
@@ -477,7 +486,7 @@ func getNewPosts(postService inrastructure.PostService, userService inrastructur
 			response.WriteErrorResponse(err, w)
 			return
 		}
-		page := NewPostsPage{Posts: postsData}
+		page := NewPostsPage{UserID: loggedUserID, Posts: postsData, RealtimeHost: realtimeClientService.GetHost(loggedUserID)}
 		err = tpl.Execute(w, page)
 		if err != nil {
 			response.WriteErrorResponse(err, w)

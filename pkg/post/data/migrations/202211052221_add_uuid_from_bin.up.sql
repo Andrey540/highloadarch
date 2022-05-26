@@ -1,4 +1,4 @@
-CREATE  FUNCTION `uuid_from_bin`(bin BINARY(16)) RETURNS varchar(36) CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci
+CREATE FUNCTION `uuid_from_bin`(bin BINARY(16)) RETURNS varchar(36) CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci
     DETERMINISTIC
     SQL SECURITY INVOKER
 RETURN

@@ -1,0 +1,28 @@
+{
+  "secret": "$CENTRIFUGO_SECRET",
+  "api_key": "$CENTRIFUGO_API_KEY",
+  "engine": "memory",
+  "prometheus": true,
+  "admin": true,
+  "debug": true,
+  "health": true,
+  "client_insecure": true,
+  "admin_password": "$CENTRIFUGO_ADMIN_PASSWORD",
+  "admin_secret": "$CENTRIFUGO_ADMIN_SECRET",
+  "port": 8000,
+  "allowed_origins": [
+    "*"
+  ],
+  "namespaces": [
+    {
+      "name": "post",
+      "anonymous": true,
+      "publish": true,
+      "join_leave": true,
+      "presence": true,
+      "presence_stats": true,
+      "history_lifetime": 60,
+      "history_recover": true
+    }
+  ]
+}

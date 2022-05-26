@@ -15,7 +15,7 @@ func (h *storingEventHandler) Handle(e event.Event) error {
 		return err
 	}
 
-	storedEvent := NewStoredEvent(h.eventStore.NewUID(), e.EventType(), msg)
+	storedEvent := NewStoredEvent(h.eventStore.NewUID(), e.EventType(), e.RoutingID(), msg)
 	return h.eventStore.Store(storedEvent)
 }
 

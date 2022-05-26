@@ -24,6 +24,15 @@ type UserFriend struct {
 	FriendID uuid.UUID
 }
 
+type User struct {
+	UserID   uuid.UUID
+	Username string
+}
+
+type UserNotifier interface {
+	Notify(userIDs []uuid.UUID, postID uuid.UUID, author, title string) error
+}
+
 type UserProvider interface {
 	ListUserSubscribers(userID uuid.UUID) ([]uuid.UUID, error)
 }
@@ -36,6 +45,12 @@ type PostRepository interface {
 type UserFriendRepository interface {
 	AddFriend(userFriend *UserFriend) error
 	RemoveFriend(userFriend *UserFriend) error
+}
+
+type UserRepository interface {
+	AddUser(user *User) error
+	RemoveUser(userID uuid.UUID) error
+	GetUser(userID uuid.UUID) (*User, error)
 }
 
 type NewsLineStore interface {
@@ -52,6 +67,9 @@ type PostService interface {
 }
 
 type UserService interface {
+	AddUser(userID uuid.UUID, username string) error
+	RemoveUser(userID uuid.UUID) error
+	GetUserName(userID uuid.UUID) (string, error)
 	AddUserFriend(userID, friendID uuid.UUID) error
 	RemoveUserFriend(userID, friendID uuid.UUID) error
 }
@@ -95,6 +113,27 @@ func NewPostService(postRepository PostRepository, newsLineStore NewsLineStore, 
 
 type userService struct {
 	userFriendRepository UserFriendRepository
+	userRepository       UserRepository
+}
+
+func (s userService) AddUser(userID uuid.UUID, username string) error {
+	user := User{
+		UserID:   userID,
+		Username: username,
+	}
+	return s.userRepository.AddUser(&user)
+}
+
+func (s userService) RemoveUser(userID uuid.UUID) error {
+	return s.userRepository.RemoveUser(userID)
+}
+
+func (s userService) GetUserName(userID uuid.UUID) (string, error) {
+	user, err := s.userRepository.GetUser(userID)
+	if user == nil || err != nil {
+		return "", err
+	}
+	return user.Username, nil
 }
 
 func (s userService) AddUserFriend(userID, friendID uuid.UUID) error {
@@ -113,8 +152,8 @@ func (s userService) RemoveUserFriend(userID, friendID uuid.UUID) error {
 	return s.userFriendRepository.RemoveFriend(&userFriend)
 }
 
-func NewUserService(userFriendRepository UserFriendRepository) UserService {
+func NewUserService(userFriendRepository UserFriendRepository, userRepository UserRepository) UserService {
 	return &userService{
-		userFriendRepository: userFriendRepository,
+		userFriendRepository: userFriendRepository, userRepository: userRepository,
 	}
 }

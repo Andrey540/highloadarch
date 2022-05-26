@@ -6,6 +6,7 @@ import (
 	"github.com/streadway/amqp"
 
 	stdlog "log"
+	"strconv"
 	"time"
 )
 
@@ -29,6 +30,8 @@ type transport struct {
 	errorLogger           *stdlog.Logger
 	queueName             string
 	suppressEventsReading bool
+	workersCount          int
+	routingKey            string
 }
 
 func (t *transport) Send(msgBody string, storedEvent app.StoredEvent) error {
@@ -37,8 +40,13 @@ func (t *transport) Send(msgBody string, storedEvent app.StoredEvent) error {
 		ContentType:  contentType,
 		Body:         []byte(msgBody),
 	}
-	routingKey := routingPrefix + storedEvent.Type
-	return t.writeChannel.Publish(domainEventsExchangeName, routingKey, false, false, msg)
+
+	workersCount := t.workersCount
+	if workersCount <= 0 {
+		workersCount = 1
+	}
+	routing := routingPrefix + strconv.Itoa(t.getRoutingKey(storedEvent.RoutingID, workersCount))
+	return t.writeChannel.Publish(domainEventsExchangeName, routing, false, false, msg)
 }
 
 func (t *transport) Connect(conn *amqp.Connection) error {
@@ -69,7 +77,11 @@ func (t *transport) connectReadChannel(err error, channel *amqp.Channel) error {
 		return err
 	}
 
-	err = channel.QueueBind(readQueue.Name, routingKey, domainEventsExchangeName, false, nil)
+	routing := routingKey
+	if t.routingKey != "" {
+		routing = t.routingKey
+	}
+	err = channel.QueueBind(readQueue.Name, routing, domainEventsExchangeName, false, nil)
 	if err != nil {
 		return err
 	}
@@ -101,14 +113,29 @@ func (t *transport) SetHandler(handler event.Handler) {
 	t.handler = handler
 }
 
-func NewEventTransport(queueName string, errorLogger *stdlog.Logger, suppressEventsReading bool) Transport {
-	return &transport{queueName: queueName, errorLogger: errorLogger, suppressEventsReading: suppressEventsReading}
+func (t *transport) getRoutingKey(routingID string, publishingMode int) int {
+	bytes := []byte(routingID)
+	sum := 0
+	for _, item := range bytes {
+		sum += int(item)
+	}
+	return sum % publishingMode
+}
+
+func NewEventTransport(queueName string, errorLogger *stdlog.Logger, suppressEventsReading bool, workersCount int, routingKey string) Transport {
+	return &transport{
+		queueName:             queueName,
+		errorLogger:           errorLogger,
+		suppressEventsReading: suppressEventsReading,
+		workersCount:          workersCount,
+		routingKey:            routingKey,
+	}
 }
 
 func CreateTransport(cnf Config, logger, errorLogger *stdlog.Logger) (app.Transport, event.Connection, error) {
 	amqpConnection := NewAMQPConnection(&cnf, logger, errorLogger)
 
-	integrationEventTransport := NewEventTransport(cnf.QueueName, errorLogger, false)
+	integrationEventTransport := NewEventTransport(cnf.QueueName, errorLogger, cnf.SuppressReading, cnf.WorkersCount, cnf.RoutingKey)
 	amqpConnection.AddChannel(integrationEventTransport)
 
 	err := amqpConnection.Start()

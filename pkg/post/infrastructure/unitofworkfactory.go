@@ -42,6 +42,10 @@ func (u *unitOfWork) UserFriendRepository() app.UserFriendRepository {
 	return NewUserFriendRepository(u.transaction)
 }
 
+func (u *unitOfWork) UserRepository() app.UserRepository {
+	return NewUserRepository(u.transaction)
+}
+
 func (u *unitOfWork) UserProvider() app.UserProvider {
 	return NewUserProvider(u.transaction)
 }

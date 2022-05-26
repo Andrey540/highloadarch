@@ -10,10 +10,11 @@ const (
 )
 
 type StoredEvent struct {
-	ID     uuid.UUID
-	Status int
-	Type   string
-	Body   string
+	ID        uuid.UUID
+	Status    int
+	Type      string
+	Body      string
+	RoutingID string
 }
 
 type EventStore interface {
@@ -22,11 +23,12 @@ type EventStore interface {
 	GetCreated() ([]StoredEvent, error)
 }
 
-func NewStoredEvent(id uuid.UUID, eventType, body string) StoredEvent {
+func NewStoredEvent(id uuid.UUID, eventType, routingID, body string) StoredEvent {
 	return StoredEvent{
-		ID:   id,
-		Type: eventType,
-		Body: body,
+		ID:        id,
+		Type:      eventType,
+		Body:      body,
+		RoutingID: routingID,
 	}
 }
 

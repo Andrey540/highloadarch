@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
+	github.com/centrifugal/centrifuge-go v0.8.2
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/golang-migrate/migrate/v4 v4.15.1

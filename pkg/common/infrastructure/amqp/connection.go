@@ -13,11 +13,14 @@ import (
 )
 
 type Config struct {
-	User           string
-	Password       string
-	Host           string
-	QueueName      string
-	ConnectTimeout time.Duration // 0 means default timeout (60 seconds)
+	User            string
+	Password        string
+	Host            string
+	QueueName       string
+	WorkersCount    int
+	RoutingKey      string
+	SuppressReading bool
+	ConnectTimeout  time.Duration // 0 means default timeout (60 seconds)
 }
 
 type Connection interface {

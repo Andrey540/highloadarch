@@ -9,6 +9,7 @@ type RepositoryFactory interface {
 	PostRepository() PostRepository
 	NewsLineStore() NewsLineStore
 	UserFriendRepository() UserFriendRepository
+	UserRepository() UserRepository
 	UserProvider() UserProvider
 }
 
@@ -34,7 +35,8 @@ func NewServiceFactory(unitOfWork UnitOfWork) ServiceFactory {
 
 func (f serviceFactory) CreateUserService() UserService {
 	userFriendRepository := f.unitOfWork.UserFriendRepository()
-	return NewUserService(userFriendRepository)
+	userRepository := f.unitOfWork.UserRepository()
+	return NewUserService(userFriendRepository, userRepository)
 }
 
 func (f serviceFactory) CreatePostService() PostService {

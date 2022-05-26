@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/amqp"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/mysql"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/tarantool"
@@ -17,10 +19,6 @@ func parseEnv() (*config, error) {
 }
 
 type config struct {
-	RedisHost     string `envconfig:"redis_host" default:"localhost"`
-	RedisPort     string `envconfig:"redis_port"  default:"6379"`
-	RedisPassword string `envconfig:"redis_password" default:""`
-
 	TarantoolHost     string `envconfig:"tarantool_host" default:"tarantool"`
 	TarantoolPort     string `envconfig:"tarantool_port"  default:"3301"`
 	TarantoolUser     string `envconfig:"tarantool_user" default:"guest"`
@@ -33,10 +31,16 @@ type config struct {
 	DBMaxConn            int    `envconfig:"db_max_conn" default:"0"`
 	DBConnectionLifetime int    `envconfig:"db_conn_lifetime" default:"0"`
 
-	AMQPHost     string `envconfig:"amqp_host"`
-	AMQPUser     string `envconfig:"amqp_user" default:"guest"`
-	AMQPPassword string `envconfig:"amqp_password" default:"guest"`
-	AMQPEnabled  int    `envconfig:"amqp_enabled" default:"1"`
+	AMQPHost                 string `envconfig:"amqp_host"`
+	AMQPUser                 string `envconfig:"amqp_user" default:"guest"`
+	AMQPPassword             string `envconfig:"amqp_password" default:"guest"`
+	AMQPEnabled              int    `envconfig:"amqp_enabled" default:"1"`
+	AMQPRoutingKey           string `envconfig:"amqp_routing_key" default:"#"`
+	AMQPSuppressEventReading int    `envconfig:"amqp_suppress_event_reading" default:"0"`
+
+	RealtimeHosts string `envconfig:"realtime_hosts" default:"[]"`
+
+	WorkersCount int `envconfig:"workers_count" default:"1"`
 
 	MigrationsDir string `envconfig:"migrations_dir"`
 
@@ -58,10 +62,13 @@ func (c *config) amqpConf() *amqp.Config {
 		return nil
 	}
 	return &amqp.Config{
-		Host:      c.AMQPHost,
-		User:      c.AMQPUser,
-		Password:  c.AMQPPassword,
-		QueueName: appID,
+		Host:            c.AMQPHost,
+		User:            c.AMQPUser,
+		Password:        c.AMQPPassword,
+		QueueName:       appID,
+		WorkersCount:    c.WorkersCount,
+		RoutingKey:      c.AMQPRoutingKey,
+		SuppressReading: c.AMQPSuppressEventReading == 1,
 	}
 }
 
@@ -72,4 +79,10 @@ func (c *config) tarantoolConf() *tarantool.Config {
 		User:     c.TarantoolUser,
 		Password: c.TarantoolPassword,
 	}
+}
+
+func (c *config) realtimeHosts() ([]string, error) {
+	result := []string{}
+	err := json.Unmarshal([]byte(c.RealtimeHosts), &result)
+	return result, err
 }

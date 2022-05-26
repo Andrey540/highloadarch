@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 )
@@ -18,6 +20,8 @@ type config struct {
 	RedisPort     string `envconfig:"redis_port"  default:"6379"`
 	RedisPassword string `envconfig:"redis_password" default:""`
 
+	RealtimeHosts string `envconfig:"realtime_hosts" default:"[]"`
+
 	MigrationsDir string `envconfig:"migrations_dir"`
 
 	ServiceHost            string `envconfig:"service_host" default:"http://socialnetwork:80"`
@@ -25,4 +29,10 @@ type config struct {
 	UserServiceURL         string `envconfig:"user_service_url" default:"http://user:80"`
 	ConversationServiceURL string `envconfig:"conversation_service_url" default:"http://conversation:80"`
 	PostServiceURL         string `envconfig:"post_service_url" default:"http://post:80"`
+}
+
+func (c *config) realtimeHosts() ([]string, error) {
+	result := []string{}
+	err := json.Unmarshal([]byte(c.RealtimeHosts), &result)
+	return result, err
 }

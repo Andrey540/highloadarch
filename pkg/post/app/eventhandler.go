@@ -4,14 +4,17 @@ import (
 	"github.com/callicoder/go-docker/pkg/common/app"
 	"github.com/callicoder/go-docker/pkg/common/app/event"
 	"github.com/callicoder/go-docker/pkg/common/uuid"
+
+	stdlog "log"
 )
 
 type eventHandlerFactory struct {
-	newsLineCache NewsLineCache
+	userNotifier UserNotifier
+	errorLogger  *stdlog.Logger
 }
 
-func NewEventHandlerFactory(newsLineCache NewsLineCache) app.EventHandlerFactory {
-	return &eventHandlerFactory{newsLineCache: newsLineCache}
+func NewEventHandlerFactory(userNotifier UserNotifier, errorLogger *stdlog.Logger) app.EventHandlerFactory {
+	return &eventHandlerFactory{userNotifier: userNotifier, errorLogger: errorLogger}
 }
 
 func (f eventHandlerFactory) CreateHandler(unitOfWork app.UnitOfWork, eventType string) (app.EventHandler, error) {
@@ -20,8 +23,12 @@ func (f eventHandlerFactory) CreateHandler(unitOfWork app.UnitOfWork, eventType 
 		return NewUserFriendAddedEventHandler(unitOfWork.(UnitOfWork)), nil
 	case event.UserFriendRemovedEvent:
 		return NewUserFriendRemovedEventHandler(unitOfWork.(UnitOfWork)), nil
+	case event.UserCreatedEvent:
+		return NewUserCreatedEventHandler(unitOfWork.(UnitOfWork)), nil
+	case event.UserRemovedEvent:
+		return NewUserRemovedEventHandler(unitOfWork.(UnitOfWork)), nil
 	case event.PostCreatedEvent:
-		return NewPostCreatedEventHandler(unitOfWork.(UnitOfWork), f.newsLineCache), nil
+		return NewPostCreatedEventHandler(unitOfWork.(UnitOfWork), f.userNotifier, f.errorLogger), nil
 	default:
 		return nil, nil
 	}
@@ -39,7 +46,8 @@ func NewUserFriendAddedEventHandler(unitOfWork UnitOfWork) app.EventHandler {
 
 func (h userFriendAddedEventHandler) Handle(currentEvent event.Event) error {
 	event1 := currentEvent.(event.UserFriendAdded)
-	userService := NewUserService(h.unitOfWork.UserFriendRepository())
+	serviceFactory := NewServiceFactory(h.unitOfWork)
+	userService := serviceFactory.CreateUserService()
 	userID, err := uuid.FromString(event1.UserID)
 	if err != nil {
 		return err
@@ -63,7 +71,8 @@ func NewUserFriendRemovedEventHandler(unitOfWork UnitOfWork) app.EventHandler {
 
 func (h userFriendRemovedEventHandler) Handle(currentEvent event.Event) error {
 	event1 := currentEvent.(event.UserFriendRemoved)
-	userService := NewUserService(h.unitOfWork.UserFriendRepository())
+	serviceFactory := NewServiceFactory(h.unitOfWork)
+	userService := serviceFactory.CreateUserService()
 	userID, err := uuid.FromString(event1.UserID)
 	if err != nil {
 		return err
@@ -75,15 +84,59 @@ func (h userFriendRemovedEventHandler) Handle(currentEvent event.Event) error {
 	return userService.RemoveUserFriend(userID, friendID)
 }
 
-type postCreatedEventHandler struct {
-	unitOfWork    UnitOfWork
-	newsLineCache NewsLineCache
+type userCreatedEventHandler struct {
+	unitOfWork UnitOfWork
 }
 
-func NewPostCreatedEventHandler(unitOfWork UnitOfWork, newsLineCache NewsLineCache) app.EventHandler {
+func NewUserCreatedEventHandler(unitOfWork UnitOfWork) app.EventHandler {
+	return &userCreatedEventHandler{
+		unitOfWork: unitOfWork,
+	}
+}
+
+func (h userCreatedEventHandler) Handle(currentEvent event.Event) error {
+	event1 := currentEvent.(event.UserCreated)
+	serviceFactory := NewServiceFactory(h.unitOfWork)
+	userService := serviceFactory.CreateUserService()
+	userID, err := uuid.FromString(event1.UserID)
+	if err != nil {
+		return err
+	}
+	return userService.AddUser(userID, event1.Username)
+}
+
+type userRemovedEventHandler struct {
+	unitOfWork UnitOfWork
+}
+
+func NewUserRemovedEventHandler(unitOfWork UnitOfWork) app.EventHandler {
+	return &userRemovedEventHandler{
+		unitOfWork: unitOfWork,
+	}
+}
+
+func (h userRemovedEventHandler) Handle(currentEvent event.Event) error {
+	event1 := currentEvent.(event.UserRemoved)
+	serviceFactory := NewServiceFactory(h.unitOfWork)
+	userService := serviceFactory.CreateUserService()
+	userID, err := uuid.FromString(event1.UserID)
+	if err != nil {
+		return err
+	}
+	return userService.RemoveUser(userID)
+}
+
+type postCreatedEventHandler struct {
+	unitOfWork   UnitOfWork
+	userNotifier UserNotifier
+	errorLogger  *stdlog.Logger
+}
+
+func NewPostCreatedEventHandler(unitOfWork UnitOfWork, userNotifier UserNotifier, errorLogger *stdlog.Logger) app.EventHandler {
 	return &postCreatedEventHandler{
-		unitOfWork:    unitOfWork,
-		newsLineCache: newsLineCache,
+		unitOfWork:   unitOfWork,
+		userNotifier: userNotifier,
+		errorLogger:  errorLogger,
 	}
 }
 
@@ -91,6 +144,7 @@ func (h postCreatedEventHandler) Handle(currentEvent event.Event) error {
 	event1 := currentEvent.(event.PostCreated)
 	serviceFactory := NewServiceFactory(h.unitOfWork)
 	postService := serviceFactory.CreatePostService()
+	userService := serviceFactory.CreateUserService()
 	postID, err := uuid.FromString(event1.PostID)
 	if err != nil {
 		return err
@@ -99,12 +153,29 @@ func (h postCreatedEventHandler) Handle(currentEvent event.Event) error {
 	if err != nil {
 		return err
 	}
-	if err != nil {
-		return err
-	}
 	err = postService.AddNewPost(postID, authorID, event1.Title)
 	if err != nil {
 		return err
+	}
+	subscribers, err := h.unitOfWork.UserProvider().ListUserSubscribers(authorID)
+	if err != nil {
+		h.errorLogger.Println(err)
+		return nil
+	}
+	if len(subscribers) == 0 {
+		return nil
+	}
+	author, err := userService.GetUserName(authorID)
+	if err != nil {
+		h.errorLogger.Println(err)
+		return nil
+	}
+	if author == "" {
+		return nil
+	}
+	err = h.userNotifier.Notify(subscribers, postID, author, event1.Title)
+	if err != nil {
+		h.errorLogger.Println(err)
 	}
 	return nil
 }

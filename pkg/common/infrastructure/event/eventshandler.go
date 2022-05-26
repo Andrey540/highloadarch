@@ -28,7 +28,7 @@ type handler struct {
 
 func (handler *handler) Handle(msg string) error {
 	handler.logger.Println("Event received: " + msg)
-	storedEvent := app.NewStoredEvent(uuid.Nil, "", "")
+	storedEvent := app.NewStoredEvent(uuid.Nil, "", "", "")
 	err := json.Unmarshal([]byte(msg), &storedEvent)
 	if err != nil {
 		handler.errorLogger.Println(err)
