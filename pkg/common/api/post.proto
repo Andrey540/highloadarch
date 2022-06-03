@@ -1,0 +1,112 @@
+syntax = "proto3";
+package api;
+
+option go_package = "./;conversation";
+option php_namespace = "Api\\Grpc\\Conversation";
+option php_metadata_namespace = "Api\\Grpc\\Conversation";
+
+// Annotations required for gprc-gateway which transforms GRPC into REST API
+// See https://grpc-ecosystem.github.io/grpc-gateway/
+import "google/api/annotations.proto";
+import "protoc-gen-swagger/options/annotations.proto";
+import "google/protobuf/empty.proto";
+
+service Post {
+  rpc CreatePost (CreatePostRequest) returns (CreatePostResponse) {
+    option (google.api.http) = {
+      post: "/post/api/v1/post"
+      body: "*"
+    };
+  }
+
+  rpc ListPosts (google.protobuf.Empty) returns (ListPostsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/post/list"
+    };
+  }
+
+  rpc ListNews (google.protobuf.Empty) returns (ListNewsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/news/list"
+    };
+  }
+
+  rpc GetPost (GetPostRequest) returns (GetPostResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/post"
+    };
+  }
+}
+
+message CreatePostRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["title", "text"]
+    }
+  };
+  string title = 1;
+  string text = 2;
+}
+
+message CreatePostResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["postID"]
+    }
+  };
+  string postID = 1;
+}
+
+message ListPostsResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["posts"]
+    }
+  };
+  repeated PostItem posts = 1;
+}
+
+message ListNewsResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["news"]
+    }
+  };
+  repeated NewsItem news = 1;
+}
+
+message GetPostRequest {
+  string postID = 1 [(grpc.gateway.protoc_gen_swagger.options.openapiv2_field) = {required: ["postID"];}];
+}
+
+message GetPostResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["post"]
+    }
+  };
+  PostItem post = 1;
+}
+
+message PostItem {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["id", "authorID", "title", "text"]
+    }
+  };
+  string id = 1;
+  string authorID = 2;
+  string title = 3;
+  string text = 4;
+}
+
+message NewsItem {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["id", "authorID", "title"]
+    }
+  };
+  string id = 1;
+  string authorID = 2;
+  string title = 3;
+}

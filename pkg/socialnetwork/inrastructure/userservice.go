@@ -1,94 +1,149 @@
 package inrastructure
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"strings"
 
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/httpclient"
+	api "github.com/callicoder/go-docker/pkg/common/api"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
-	userrequest "github.com/callicoder/go-docker/pkg/common/infrastructure/request/user"
-	userresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/user"
+	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 )
 
-type UserService struct {
-	baseURL string
-	client  httpclient.HTTPClient
+type RegisterUser struct {
+	Username  string `json:"username"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Age       int    `json:"age"`
+	Sex       int    `json:"sex"`
+	Interests string `json:"interests"`
+	City      string `json:"city"`
+	Password  string `json:"password"`
 }
 
-func (s UserService) AuthUser(r *http.Request) (userresponse.User, error) {
+type UpdateUser struct {
+	Username  string `json:"username"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Age       int    `json:"age"`
+	Sex       int    `json:"sex"`
+	Interests string `json:"interests"`
+	City      string `json:"city"`
+	Password  string `json:"password"`
+}
+
+type Auth struct {
+	UserName string `json:"username"`
+	Password string `json:"password"`
+}
+
+type UserService struct {
+	client api.UserClient
+}
+
+func (s UserService) AuthUser(r *http.Request) (*api.SignInResponse, error) {
 	decoder := json.NewDecoder(r.Body)
-	var authRequest userrequest.Auth
+	var authRequest Auth
 	err := decoder.Decode(&authRequest)
 	if err != nil {
-		return userresponse.User{}, err
+		return nil, err
 	}
-	var response userresponse.User
-	err = s.client.MakeJSONRequest(authRequest, &response, http.MethodPost, s.baseURL+userrequest.SignInURL, nil)
-	return response, err
+	req := &api.SignInRequest{
+		UserName: authRequest.UserName,
+		Password: authRequest.Password,
+	}
+	ctx := getGRPCContext(context.Background(), r)
+	return s.client.SignIn(ctx, req)
 }
 
-func (s UserService) RegisterUser(r *http.Request) (userresponse.User, error) {
+func (s UserService) RegisterUser(r *http.Request) (*api.RegisterUserResponse, error) {
 	decoder := json.NewDecoder(r.Body)
-	var registerRequest userrequest.RegisterUser
+	var registerRequest RegisterUser
 	err := decoder.Decode(&registerRequest)
 	if err != nil {
-		return userresponse.User{}, err
+		return nil, errors.WithStack(err)
 	}
-	var response userresponse.User
-	err = s.client.MakeJSONRequest(registerRequest, &response, http.MethodPost, s.baseURL+userrequest.RegisterURL, nil)
-	return response, err
+	req := &api.RegisterUserRequest{
+		UserName:  registerRequest.Username,
+		FirstName: registerRequest.FirstName,
+		LastName:  registerRequest.LastName,
+		Age:       uint32(registerRequest.Age),
+		Sex:       uint32(registerRequest.Sex),
+		Interests: registerRequest.Interests,
+		City:      registerRequest.City,
+		Password:  registerRequest.Password,
+	}
+	ctx := getGRPCContext(context.Background(), r)
+	return s.client.RegisterUser(ctx, req)
 }
 
-func (s UserService) GetMyProfile(r *http.Request) (userresponse.Data, error) {
-	var response userresponse.Data
-	headers := getHeaders(r)
-	loggedUserID := getUserIDFromContext(r)
-	url := strings.ReplaceAll(s.baseURL+userrequest.ProfileURL, "{id}", loggedUserID)
-	err := s.client.MakeJSONRequest(nil, &response, http.MethodGet, url, headers)
-	return response, err
+func (s UserService) GetMyProfile(r *http.Request) (*api.UserData, error) {
+	loggedUserID := GetUserIDFromContext(r)
+	req := &api.GetProfileRequest{
+		UserID: loggedUserID,
+	}
+	ctx := getGRPCContext(context.Background(), r)
+	resp, err := s.client.GetProfile(ctx, req)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return resp.User, nil
 }
 
-func (s UserService) GetUserProfile(r *http.Request) (userresponse.Data, error) {
-	var response userresponse.Data
-	headers := getHeaders(r)
+func (s UserService) GetUserProfile(r *http.Request) (*api.UserData, error) {
 	userID := request.GetIDFromRequest(r)
-	url := strings.ReplaceAll(s.baseURL+userrequest.ProfileURL, "{id}", userID)
-	err := s.client.MakeJSONRequest(nil, &response, http.MethodGet, url, headers)
-	return response, err
+	req := &api.GetProfileRequest{
+		UserID: userID,
+	}
+	ctx := getGRPCContext(context.Background(), r)
+	resp, err := s.client.GetProfile(ctx, req)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return resp.User, nil
 }
 
-func (s UserService) ListMyFriends(r *http.Request) ([]userresponse.Friend, error) {
-	var response []userresponse.Friend
-	headers := getHeaders(r)
-	loggedUserID := getUserIDFromContext(r)
-	url := strings.ReplaceAll(s.baseURL+userrequest.ListUserFriendsURL, "{id}", loggedUserID)
-	fmt.Println(url)
-	err := s.client.MakeJSONRequest(nil, &response, http.MethodGet, url, headers)
-	return response, err
+func (s UserService) ListMyFriends(r *http.Request) ([]*api.Friend, error) {
+	loggedUserID := GetUserIDFromContext(r)
+	req := &api.ListFriendsRequest{
+		UserID: loggedUserID,
+	}
+	ctx := getGRPCContext(context.Background(), r)
+	resp, err := s.client.ListFriends(ctx, req)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return resp.Friends, nil
 }
 
-func (s UserService) ListUserFriends(r *http.Request) ([]userresponse.Friend, error) {
-	var response []userresponse.Friend
-	headers := getHeaders(r)
+func (s UserService) ListUserFriends(r *http.Request) ([]*api.Friend, error) {
 	userID := request.GetIDFromRequest(r)
-	url := strings.ReplaceAll(s.baseURL+userrequest.ListUserFriendsURL, "{id}", userID)
-	err := s.client.MakeJSONRequest(nil, &response, http.MethodGet, url, headers)
-	return response, err
+	req := &api.ListFriendsRequest{
+		UserID: userID,
+	}
+	ctx := getGRPCContext(context.Background(), r)
+	resp, err := s.client.ListFriends(ctx, req)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return resp.Friends, nil
 }
 
-func (s UserService) ListUsers(r *http.Request, ids []string) ([]userresponse.ListItemDTO, error) {
-	var response []userresponse.ListItemDTO
-	listUsersRequest := userrequest.ListUsers{UserIds: ids}
-	headers := getHeaders(r)
-	err := s.client.MakeJSONRequest(listUsersRequest, &response, http.MethodGet, s.baseURL+userrequest.ListUsersURL, headers)
-	return response, err
+func (s UserService) ListUsers(r *http.Request, ids []string) ([]*api.UserListItem, error) {
+	req := &api.ListUsersRequest{
+		UserIDs: ids,
+	}
+	ctx := getGRPCContext(context.Background(), r)
+	resp, err := s.client.ListUsers(ctx, req)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return resp.Users, nil
 }
 
-func NewUserService(baseURL string, client httpclient.HTTPClient) UserService {
+func NewUserService(conn grpc.ClientConnInterface) UserService {
 	return UserService{
-		client:  client,
-		baseURL: baseURL,
+		client: api.NewUserClient(conn),
 	}
 }

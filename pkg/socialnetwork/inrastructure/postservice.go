@@ -1,46 +1,54 @@
 package inrastructure
 
 import (
+	"context"
 	"net/http"
-	"strings"
 
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/httpclient"
+	api "github.com/callicoder/go-docker/pkg/common/api"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
-	postrequest "github.com/callicoder/go-docker/pkg/common/infrastructure/request/post"
-	postresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/post"
+	"github.com/golang/protobuf/ptypes/empty"
+	"google.golang.org/grpc"
 )
 
 type PostService struct {
-	baseURL string
-	client  httpclient.HTTPClient
+	client api.PostClient
 }
 
-func (s PostService) ListPosts(r *http.Request) ([]postresponse.Data, error) {
-	var response []postresponse.Data
-	headers := getHeaders(r)
-	err := s.client.MakeJSONRequest(nil, &response, http.MethodGet, s.baseURL+postrequest.ListPostsURL, headers)
-	return response, err
+func (s PostService) ListPosts(r *http.Request) ([]*api.PostItem, error) {
+	req := &empty.Empty{}
+	ctx := getGRPCContext(context.Background(), r)
+	res, err := s.client.ListPosts(ctx, req)
+	if err != nil {
+		return []*api.PostItem{}, err
+	}
+	return res.Posts, nil
 }
 
-func (s PostService) ListNews(r *http.Request) ([]postresponse.NewsListItem, error) {
-	var response []postresponse.NewsListItem
-	headers := getHeaders(r)
-	err := s.client.MakeJSONRequest(nil, &response, http.MethodGet, s.baseURL+postrequest.ListNewsURL, headers)
-	return response, err
+func (s PostService) ListNews(r *http.Request) ([]*api.NewsItem, error) {
+	req := &empty.Empty{}
+	ctx := getGRPCContext(context.Background(), r)
+	res, err := s.client.ListNews(ctx, req)
+	if err != nil {
+		return []*api.NewsItem{}, err
+	}
+	return res.News, nil
 }
 
-func (s PostService) GetPost(r *http.Request) (postresponse.Data, error) {
-	var response postresponse.Data
-	headers := getHeaders(r)
+func (s PostService) GetPost(r *http.Request) (*api.PostItem, error) {
 	postID := request.GetIDFromRequest(r)
-	url := strings.ReplaceAll(s.baseURL+postrequest.GetPostURL, "{id}", postID)
-	err := s.client.MakeJSONRequest(nil, &response, http.MethodGet, url, headers)
-	return response, err
+	req := &api.GetPostRequest{
+		PostID: postID,
+	}
+	ctx := getGRPCContext(context.Background(), r)
+	res, err := s.client.GetPost(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return res.Post, nil
 }
 
-func NewPostService(baseURL string, client httpclient.HTTPClient) PostService {
+func NewPostService(conn grpc.ClientConnInterface) PostService {
 	return PostService{
-		client:  client,
-		baseURL: baseURL,
+		client: api.NewPostClient(conn),
 	}
 }

@@ -45,25 +45,25 @@ func (s newsLineQueryService) ListPosts(userID uuid.UUID) ([]*app.PostDTO, error
 	return result, nil
 }
 
-func (s newsLineQueryService) ListNews(userID uuid.UUID) (*[]app.NewsLineItem, error) {
+func (s newsLineQueryService) ListNews(userID uuid.UUID) ([]*app.NewsLineItem, error) {
 	return s.listNewsTarantool(userID)
 }
 
-func (s newsLineQueryService) listNewsTarantool(userID uuid.UUID) (*[]app.NewsLineItem, error) {
+func (s newsLineQueryService) listNewsTarantool(userID uuid.UUID) ([]*app.NewsLineItem, error) {
 	var newsItems []newsLineItem
 	err := s.tarantoolClient.Select("mysqldata", "user_idx", 0, maxNewsCount, userID.String(), &newsItems)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	result := []app.NewsLineItem{}
+	result := []*app.NewsLineItem{}
 	for _, news := range newsItems {
-		result = append(result, app.NewsLineItem{ID: news.PostID, Author: news.AuthorID, Title: news.Title})
+		result = append(result, &app.NewsLineItem{ID: news.PostID, Author: news.AuthorID, Title: news.Title})
 	}
-	return &result, err
+	return result, err
 }
 
 // nolint: unused
-func (s newsLineQueryService) listNewsSQL(userID uuid.UUID) (*[]app.NewsLineItem, error) {
+func (s newsLineQueryService) listNewsSQL(userID uuid.UUID) ([]*app.NewsLineItem, error) {
 	const sqlQuery = `SELECT post_id, author_id, title FROM news_line WHERE user_id=? ORDER BY id DESC LIMIT ?`
 	rows, err := s.client.Query(sqlQuery, userID.String(), maxNewsCount)
 	if err != nil {
@@ -72,17 +72,17 @@ func (s newsLineQueryService) listNewsSQL(userID uuid.UUID) (*[]app.NewsLineItem
 	if rows.Err() != nil {
 		return nil, errors.WithStack(rows.Err())
 	}
-	var result []app.NewsLineItem
+	var result []*app.NewsLineItem
 	for rows.Next() {
 		var post app.NewsLineItem
 		err1 := rows.Scan(&post.ID, &post.Author, &post.Title)
 		if err1 != nil {
 			return nil, errors.WithStack(err)
 		}
-		result = append(result, post)
+		result = append(result, &post)
 	}
 	defer rows.Close()
-	return &result, nil
+	return result, nil
 }
 
 func (s newsLineQueryService) GetPost(postID uuid.UUID) (*app.PostDTO, error) {

@@ -6,13 +6,18 @@ export GO111MODULE=on
 
 all: build test check
 
+# Generates Go code before 'build' target
+.PHONY: generate
+generate:
+	bin/grpc-generate $(foreach path,$(APP_PROTO_FILES), "$(path)")
+
 .PHONY: modules
 modules:
 	go mod tidy
 
 # Builds Go binaries
 .PHONY: build
-build: modules
+build: generate modules
 	bin/run-go-build $(foreach name,$(APP_CMD_NAMES), "$(name)")
 
 # Removes built Go binaries

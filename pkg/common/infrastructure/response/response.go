@@ -45,17 +45,6 @@ func WriteSuccessResponse(w http.ResponseWriter) {
 	_, _ = w.Write(data)
 }
 
-func WriteForbiddenResponse(w http.ResponseWriter) {
-	data, err := json.Marshal(Response{Message: http.StatusText(http.StatusForbidden)})
-	if err != nil {
-		WriteErrorResponse(err, w)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusForbidden)
-	_, _ = w.Write(data)
-}
-
 func WriteNotFoundResponse(err error, w http.ResponseWriter) {
 	data, err := json.Marshal(Response{Message: err.Error()})
 	if err != nil {
@@ -64,28 +53,6 @@ func WriteNotFoundResponse(err error, w http.ResponseWriter) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusNotFound)
-	_, _ = w.Write(data)
-}
-
-func WriteDuplicateRequestResponse(err error, w http.ResponseWriter) {
-	data, err := json.Marshal(Response{Message: err.Error()})
-	if err != nil {
-		WriteErrorResponse(err, w)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusConflict)
-	_, _ = w.Write(data)
-}
-
-func WriteBadRequestResponse(err error, w http.ResponseWriter) {
-	data, err := json.Marshal(Response{Message: err.Error()})
-	if err != nil {
-		WriteErrorResponse(err, w)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusBadRequest)
 	_, _ = w.Write(data)
 }
 

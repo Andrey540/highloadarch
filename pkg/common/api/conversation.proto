@@ -1,0 +1,96 @@
+syntax = "proto3";
+package api;
+
+option go_package = "./;conversation";
+option php_namespace = "Api\\Grpc\\Conversation";
+option php_metadata_namespace = "Api\\Grpc\\Conversation";
+
+// Annotations required for gprc-gateway which transforms GRPC into REST API
+// See https://grpc-ecosystem.github.io/grpc-gateway/
+import "google/api/annotations.proto";
+import "protoc-gen-swagger/options/annotations.proto";
+
+service Conversation {
+  rpc StartConversation (StartConversationRequest) returns (StartConversationResponse) {
+    option (google.api.http) = {
+      post: "/conversation/api/v1/start"
+      body: "*"
+    };
+  }
+
+  rpc AddMessage (AddMessageRequest) returns (AddMessageResponse) {
+    option (google.api.http) = {
+      post: "/conversation/api/v1/message/add"
+      body: "*"
+    };
+  }
+
+  rpc ListMessages (ListMessagesRequest) returns (ListMessagesResponse) {
+    option (google.api.http) = {
+      get: "/conversation/api/v1/conversation"
+    };
+  }
+}
+
+message StartConversationRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["user", "target"]
+    }
+  };
+  string user = 1;
+  string target = 2;
+}
+
+message StartConversationResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["conversationID"]
+    }
+  };
+  string conversationID = 1;
+}
+
+message AddMessageRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["conversationID", "text"]
+    }
+  };
+  string conversationID = 1;
+  string text = 2;
+}
+
+message AddMessageResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["messageID"]
+    }
+  };
+  string messageID = 1;
+}
+
+message ListMessagesRequest {
+  string conversationID = 1 [(grpc.gateway.protoc_gen_swagger.options.openapiv2_field) = { required: ["conversationID"]; }];
+}
+
+message ListMessagesResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["messages"]
+    }
+  };
+  repeated Message messages = 1;
+}
+
+message Message {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["id", "conversationID", "userID", "text"]
+    }
+  };
+  string id = 1;
+  string conversationID = 2;
+  string userID = 3;
+  string text = 4;
+}

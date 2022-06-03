@@ -65,11 +65,9 @@
     addToFriendsButton.addEventListener("click", function () {
         let xhr = new XMLHttpRequest();
         //open the request
-        xhr.open('POST', '/user/api/v1/friend/add/' + userId);
+        xhr.open('POST', '/user/api/v1/friend/add');
         xhr.setRequestHeader("Content-Type", "application/json");
-
-        //send the form data
-        xhr.send(JSON.stringify({}));
+        xhr.send(JSON.stringify({userID: userId}));
 
         xhr.onreadystatechange = function () {
             if (xhr.readyState === XMLHttpRequest.DONE) {
@@ -88,11 +86,9 @@
     removeFromFriendsButton.addEventListener("click", function () {
         let xhr = new XMLHttpRequest();
         //open the request
-        xhr.open('POST', '/user/api/v1/friend/remove/' + userId);
+        xhr.open('POST', '/user/api/v1/friend/remove');
         xhr.setRequestHeader("Content-Type", "application/json");
-
-        //send the form data
-        xhr.send(JSON.stringify({}));
+        xhr.send(JSON.stringify({userID: userId}));
 
         xhr.onreadystatechange = function () {
             if (xhr.readyState === XMLHttpRequest.DONE) {

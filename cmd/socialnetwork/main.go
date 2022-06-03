@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"html/template"
 	stdlog "log"
 	"net/http"
@@ -11,19 +10,18 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/httpclient"
+	api "github.com/callicoder/go-docker/pkg/common/api"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/metrics"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/realtime"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/redis"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/response"
-	conversationresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/conversation"
-	postresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/post"
-	userresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/user"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/server"
 	"github.com/callicoder/go-docker/pkg/socialnetwork/inrastructure"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	satoriuuid "github.com/satori/go.uuid"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -50,9 +48,26 @@ type ListUserItem struct {
 
 type UserProfilePage struct { // nolint: maligned
 	IsSelfProfile bool
-	Profile       userresponse.Data
-	Friends       []userresponse.Friend
+	Profile       UserData
+	Friends       []FriendData
 	IsFriend      bool
+}
+
+type FriendData struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+}
+
+type UserData struct {
+	ID        string `json:"id"`
+	Username  string `json:"username"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Age       int    `json:"age"`
+	Sex       int    `json:"sex"`
+	Interests string `json:"interests"`
+	City      string `json:"city"`
+	Password  string `json:"password"`
 }
 
 type MessageData struct {
@@ -122,11 +137,33 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 		}
 	}()
 
-	httpClient := http.Client{Timeout: time.Minute}
-	wrappedClient := httpclient.NewHTTPClient(httpClient)
-	userService := inrastructure.NewUserService(cnf.UserServiceURL, wrappedClient)
-	conversationService := inrastructure.NewConversationService(cnf.ConversationServiceURL, wrappedClient)
-	postService := inrastructure.NewPostService(cnf.PostServiceURL, wrappedClient)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	userGRPCConn, err := grpc.DialContext(ctx, cnf.UserServiceGRPCAddress, grpc.WithInsecure())
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	// noinspection GoUnhandledErrorResult
+	defer userGRPCConn.Close()
+
+	conversationGRPCConn, err := grpc.DialContext(ctx, cnf.ConversationServiceGRPCAddress, grpc.WithInsecure())
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	// noinspection GoUnhandledErrorResult
+	defer conversationGRPCConn.Close()
+
+	postGRPCConn, err := grpc.DialContext(ctx, cnf.PostServiceGRPCAddress, grpc.WithInsecure())
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	// noinspection GoUnhandledErrorResult
+	defer postGRPCConn.Close()
+
+	userService := inrastructure.NewUserService(userGRPCConn)
+	conversationService := inrastructure.NewConversationService(conversationGRPCConn)
+	postService := inrastructure.NewPostService(postGRPCConn)
 	realtimeHosts, err := cnf.realtimeHosts()
 	if err != nil {
 		return err
@@ -189,12 +226,12 @@ func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.
 		router.HandleFunc("/app/post/news", getNewPosts(postService, userService, realtimeClientService, newPostsTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/post/{id}", getPost(postService, userService, postTpl)).Methods(http.MethodGet)
 
-		router.PathPrefix("/user/api/").HandlerFunc(proxyRequest(config.UserServiceURL))
-		router.PathPrefix("/conversation/api/").HandlerFunc(proxyRequest(config.ConversationServiceURL))
-		router.PathPrefix("/post/api/").HandlerFunc(proxyRequest(config.PostServiceURL))
+		router.PathPrefix("/user/api/").HandlerFunc(proxyRequest(config.UserServiceRESTAddress))
+		router.PathPrefix("/conversation/api/").HandlerFunc(proxyRequest(config.ConversationServiceRESTAddress))
+		router.PathPrefix("/post/api/").HandlerFunc(proxyRequest(config.PostServiceRESTAddress))
 
 		nextRequestID := func() string {
-			return fmt.Sprintf("%d", time.Now().UnixNano())
+			return satoriuuid.NewV1().String()
 		}
 
 		metricsHandler.AddMetricsMiddleware(router)
@@ -237,8 +274,13 @@ func proxyRequest(serviceURL string) http.HandlerFunc {
 			return
 		}
 
-		loggedUserID := getUserIDFromContext(r)
+		loggedUserID := inrastructure.GetUserIDFromContext(r)
+		requestID := server.GetRequestIDFromContext(r)
+
 		r.Header.Set(request.UserIDHeader, loggedUserID)
+		if requestID != "" {
+			r.Header.Set(request.RequestIDHeader, requestID)
+		}
 
 		proxy := httputil.NewSingleHostReverseProxy(proxyURL)
 		proxy.ServeHTTP(w, r)
@@ -250,6 +292,10 @@ func authUser(userService inrastructure.UserService, sessionService redis.Sessio
 		authResponse, err := userService.AuthUser(r)
 		if err != nil {
 			response.WriteUnauthorizedResponse(err.Error(), w)
+			return
+		}
+		if authResponse == nil {
+			response.WriteUnauthorizedResponse("Unauthorized", w)
 			return
 		}
 		session, err := sessionService.SaveSession(authResponse.UserID)
@@ -334,8 +380,8 @@ func getMyProfile(userService inrastructure.UserService, tpl *template.Template)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		profile := UserProfilePage{
 			IsSelfProfile: true,
-			Profile:       user,
-			Friends:       friends,
+			Profile:       getProfile(user),
+			Friends:       getFriends(friends),
 			IsFriend:      false,
 		}
 		err = tpl.Execute(w, profile)
@@ -358,7 +404,7 @@ func getUserProfile(userService inrastructure.UserService, tpl *template.Templat
 			response.WriteErrorResponse(err, w)
 			return
 		}
-		loggedUserID := getUserIDFromContext(r)
+		loggedUserID := inrastructure.GetUserIDFromContext(r)
 		userID := request.GetIDFromRequest(r)
 
 		myFriends, err := userService.ListMyFriends(r)
@@ -370,8 +416,8 @@ func getUserProfile(userService inrastructure.UserService, tpl *template.Templat
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		profile := UserProfilePage{
 			IsSelfProfile: loggedUserID == userID,
-			Profile:       user,
-			Friends:       friends,
+			Profile:       getProfile(user),
+			Friends:       getFriends(friends),
 			IsFriend:      isUserFriend,
 		}
 		err = tpl.Execute(w, profile)
@@ -418,7 +464,7 @@ func getConversation(userService inrastructure.UserService, conversationService 
 		for _, message := range messages {
 			userIDs = append(userIDs, message.UserID)
 		}
-		loggedUserID := getUserIDFromContext(r)
+		loggedUserID := inrastructure.GetUserIDFromContext(r)
 		userIDs = append(userIDs, loggedUserID)
 		usersMap, err := getUsersMap(r, userService, userIDs)
 		if err != nil {
@@ -432,7 +478,7 @@ func getConversation(userService inrastructure.UserService, conversationService 
 			response.WriteErrorResponse(err, w)
 			return
 		}
-		page := ConversationPage{ID: conversationID, UserName: loggedUser.Username, Messages: messagesData}
+		page := ConversationPage{ID: conversationID, UserName: loggedUser.UserName, Messages: messagesData}
 		err = tpl.Execute(w, page)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
@@ -465,7 +511,7 @@ func getMyPosts(postService inrastructure.PostService, tpl *template.Template) h
 
 func getNewPosts(postService inrastructure.PostService, userService inrastructure.UserService, realtimeClientService realtime.ClientService, tpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		loggedUserID := getUserIDFromContext(r)
+		loggedUserID := inrastructure.GetUserIDFromContext(r)
 		posts, err := postService.ListNews(r)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
@@ -512,7 +558,7 @@ func getPost(postService inrastructure.PostService, userService inrastructure.Us
 			return
 		}
 		user := usersMap[post.AuthorID]
-		data := PostData{ID: post.ID, Author: user.Username, Title: post.Title, Text: post.Text}
+		data := PostData{ID: post.Id, Author: user.UserName, Title: post.Title, Text: post.Text}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		page := PostPage{Post: data}
 		err = tpl.Execute(w, page)
@@ -523,10 +569,10 @@ func getPost(postService inrastructure.PostService, userService inrastructure.Us
 	}
 }
 
-func listUserResponse(user userresponse.ListItemDTO) ListUserItem {
+func listUserResponse(user *api.UserListItem) ListUserItem {
 	return ListUserItem{
-		ID:       user.ID,
-		Username: user.Username,
+		ID:       user.UserID,
+		Username: user.UserName,
 	}
 }
 
@@ -548,56 +594,75 @@ func writeUserCreatedResponse(id string, w http.ResponseWriter) {
 	_, _ = w.Write(data)
 }
 
-func isUserFriend(loggedUserID string, friends []userresponse.Friend) bool {
+func isUserFriend(loggedUserID string, friends []*api.Friend) bool {
 	for _, friend := range friends {
-		if friend.ID == loggedUserID {
+		if friend.UserID == loggedUserID {
 			return true
 		}
 	}
 	return false
 }
 
-func getUserIDFromContext(r *http.Request) string {
-	ctx := r.Context()
-	userSession := ctx.Value(inrastructure.UserCtxKey).(*redis.UserSession)
-	return userSession.UserID
+func getProfile(user *api.UserData) UserData {
+	return UserData{
+		ID:        user.Id,
+		Username:  user.UserName,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		Age:       int(user.Age),
+		Sex:       int(user.Sex),
+		Interests: user.Interests,
+		City:      user.City,
+		Password:  user.Password,
+	}
 }
 
-func getUsersMap(r *http.Request, userService inrastructure.UserService, ids []string) (map[string]userresponse.ListItemDTO, error) {
-	result := make(map[string]userresponse.ListItemDTO)
+func getFriends(friends []*api.Friend) []FriendData {
+	result := make([]FriendData, len(friends))
+	for _, friend := range friends {
+		result = append(result, FriendData{
+			ID:       friend.UserID,
+			Username: friend.UserName,
+		})
+	}
+	return result
+}
+
+func getUsersMap(r *http.Request, userService inrastructure.UserService, ids []string) (map[string]*api.UserListItem, error) {
+	result := make(map[string]*api.UserListItem)
 	users, err := userService.ListUsers(r, ids)
 	if err != nil {
 		return nil, err
 	}
 	for _, user := range users {
-		result[user.ID] = user
+		result[user.UserID] = user
 	}
 	return result, nil
 }
 
-func getMessages(usersMap map[string]userresponse.ListItemDTO, messages []conversationresponse.MessageData) ([]MessageData, error) {
+func getMessages(usersMap map[string]*api.UserListItem, messages []*api.Message) ([]MessageData, error) {
 	var result []MessageData
 	for _, message := range messages {
 		if user, found := usersMap[message.UserID]; found {
-			result = append(result, MessageData{ID: message.ID, UserName: user.Username, Text: message.Text})
+			result = append(result, MessageData{ID: message.Id, UserName: user.UserName, Text: message.Text})
 		}
 	}
 	return result, nil
 }
 
-func getPosts(posts []postresponse.Data) ([]PostData, error) {
+func getPosts(posts []*api.PostItem) ([]PostData, error) {
 	result := []PostData{}
 	for _, post := range posts {
-		result = append(result, PostData{ID: post.ID, Title: post.Title, Text: post.Text})
+		result = append(result, PostData{ID: post.Id, Title: post.Title, Text: post.Text})
 	}
 	return result, nil
 }
 
-func getNews(usersMap map[string]userresponse.ListItemDTO, posts []postresponse.NewsListItem) ([]NewPostData, error) {
+func getNews(usersMap map[string]*api.UserListItem, posts []*api.NewsItem) ([]NewPostData, error) {
 	var result []NewPostData
 	for _, post := range posts {
 		if user, found := usersMap[post.AuthorID]; found {
-			result = append(result, NewPostData{ID: post.ID, Author: user.Username, Title: post.Title})
+			result = append(result, NewPostData{ID: post.Id, Author: user.UserName, Title: post.Title})
 		}
 	}
 	return result, nil

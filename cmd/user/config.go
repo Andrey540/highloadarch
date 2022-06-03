@@ -31,8 +31,8 @@ type config struct {
 
 	MigrationsDir string `envconfig:"migrations_dir"`
 
-	ServiceHost      string `envconfig:"service_host" default:"http://socialnetwork:80"`
 	ServeRESTAddress string `envconfig:"serve_rest_address" default:":80"`
+	ServeGRPCAddress string `envconfig:"serve_grpc_address" default:":81"`
 }
 
 func (c *config) masterDSN() mysql.DSN {

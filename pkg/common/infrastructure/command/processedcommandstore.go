@@ -14,8 +14,8 @@ type processedCommandStore struct {
 
 func (store *processedCommandStore) Store(processedCommand app.ProcessedCommand) error {
 	const query = `INSERT INTO processed_command (id) VALUES (?);`
-	_, err := store.client.Exec(query, processedCommand.ID)
-	return err
+	_, err := store.client.Exec(query, commonsql.BinaryUUID(processedCommand.ID))
+	return errors.WithStack(err)
 }
 
 func (store *processedCommandStore) GetCommand(id uuid.UUID) (*app.ProcessedCommand, error) {

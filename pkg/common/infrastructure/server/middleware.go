@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/redis"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/response"
 )
 
 const (
-	RequestIDHeader     = "X-Request-Id"
-	RequestIDKey    key = 0
+	RequestIDKey key = 0
 )
 
 type key int
@@ -22,11 +22,8 @@ func LoggingMiddleware(log *stdlog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			body := []byte{}
 			defer func() {
-				requestID, ok := r.Context().Value(RequestIDKey).(string)
-				if !ok {
-					requestID = "unknown"
-				}
-				log.Println(requestID, r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent())
+				requestID := GetRequestIDFromContext(r)
+				log.Println("RequestID: "+requestID, r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent())
 				log.Println("Response: " + string(body))
 			}()
 			rw := &responseWriter{w, body}
@@ -39,12 +36,12 @@ func LoggingMiddleware(log *stdlog.Logger) func(http.Handler) http.Handler {
 func TracingMiddleware(nextRequestID func() string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requestID := r.Header.Get(RequestIDHeader)
+			requestID := r.Header.Get(request.RequestIDHeader)
 			if requestID == "" {
 				requestID = nextRequestID()
 			}
 			ctx := context.WithValue(r.Context(), RequestIDKey, requestID)
-			w.Header().Set(RequestIDHeader, requestID)
+			w.Header().Set(request.RequestIDHeader, requestID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

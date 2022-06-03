@@ -24,11 +24,14 @@ type config struct {
 
 	MigrationsDir string `envconfig:"migrations_dir"`
 
-	ServiceHost            string `envconfig:"service_host" default:"http://socialnetwork:80"`
-	ServeRESTAddress       string `envconfig:"serve_rest_address" default:":80"`
-	UserServiceURL         string `envconfig:"user_service_url" default:"http://user:80"`
-	ConversationServiceURL string `envconfig:"conversation_service_url" default:"http://conversation:80"`
-	PostServiceURL         string `envconfig:"post_service_url" default:"http://post:80"`
+	ServiceHost                    string `envconfig:"service_host" default:"http://socialnetwork:80"`
+	ServeRESTAddress               string `envconfig:"serve_rest_address" default:":80"`
+	UserServiceRESTAddress         string `envconfig:"user_service_rest_address" default:"http://user:80"`
+	UserServiceGRPCAddress         string `envconfig:"user_service_grpc_address" default:"user:81"`
+	ConversationServiceRESTAddress string `envconfig:"conversation_service_rest_address" default:"http://conversation:80"`
+	ConversationServiceGRPCAddress string `envconfig:"conversation_service_grpc_address" default:"conversation:81"`
+	PostServiceRESTAddress         string `envconfig:"post_service_rest_address" default:"http://post:80"`
+	PostServiceGRPCAddress         string `envconfig:"post_service_grpc_address" default:"post:81"`
 }
 
 func (c *config) realtimeHosts() ([]string, error) {

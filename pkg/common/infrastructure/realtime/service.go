@@ -95,7 +95,6 @@ func (s *service) Publish(messages []Message) error {
 		if subscription == nil {
 			continue
 		}
-		//_, err := subscription.Publish(message.Data)
 		_, err := client.Publish(s.channelPrefix+":"+message.ChannelID, message.Data)
 		if err != nil {
 			return errors.WithStack(err)

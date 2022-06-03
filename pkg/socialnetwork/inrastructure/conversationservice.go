@@ -1,41 +1,47 @@
 package inrastructure
 
 import (
-	"net/http"
-	"strings"
-
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/httpclient"
+	api "github.com/callicoder/go-docker/pkg/common/api"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
-	conversationrequest "github.com/callicoder/go-docker/pkg/common/infrastructure/request/conversation"
-	conversationresponse "github.com/callicoder/go-docker/pkg/common/infrastructure/response/conversation"
+	"google.golang.org/grpc"
+
+	"context"
+	"net/http"
 )
 
 type ConversationService struct {
-	baseURL string
-	client  httpclient.HTTPClient
+	client api.ConversationClient
 }
 
 func (s ConversationService) GetConversationID(r *http.Request) (string, error) {
-	var response conversationresponse.Conversation
-	headers := getHeaders(r)
 	userID := request.GetIDFromRequest(r)
-	loggedUserID := getUserIDFromContext(r)
-	startConversationRequest := conversationrequest.StartUserConversation{User: loggedUserID, Target: userID}
-	err := s.client.MakeJSONRequest(startConversationRequest, &response, http.MethodPost, s.baseURL+conversationrequest.StartConversationURL, headers)
-	return response.ConversationID, err
+	loggedUserID := GetUserIDFromContext(r)
+	req := &api.StartConversationRequest{
+		User:   loggedUserID,
+		Target: userID,
+	}
+	ctx := getGRPCContext(context.Background(), r)
+	res, err := s.client.StartConversation(ctx, req)
+	if err != nil {
+		return "", err
+	}
+	return res.ConversationID, nil
 }
 
-func (s ConversationService) ListMessages(r *http.Request, conversationID string) ([]conversationresponse.MessageData, error) {
-	var response []conversationresponse.MessageData
-	headers := getHeaders(r)
-	url := strings.ReplaceAll(s.baseURL+conversationrequest.GetConversationURL, "{id}", conversationID)
-	err := s.client.MakeJSONRequest(nil, &response, http.MethodGet, url, headers)
-	return response, err
+func (s ConversationService) ListMessages(r *http.Request, conversationID string) ([]*api.Message, error) {
+	req := &api.ListMessagesRequest{
+		ConversationID: conversationID,
+	}
+	ctx := getGRPCContext(context.Background(), r)
+	res, err := s.client.ListMessages(ctx, req)
+	if err != nil {
+		return []*api.Message{}, err
+	}
+	return res.Messages, nil
 }
 
-func NewConversationService(baseURL string, client httpclient.HTTPClient) ConversationService {
+func NewConversationService(conn grpc.ClientConnInterface) ConversationService {
 	return ConversationService{
-		client:  client,
-		baseURL: baseURL,
+		client: api.NewConversationClient(conn),
 	}
 }

@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# This script takes $NAME.proto and generates:
+#  - $NAME.pb.go - GRPC API server interface and client implementation
+#  - $NAME.pb.gw.go - stubs for GRPC-Gateway which builds REST API over GRPC API
+#  - $NAME.swagger.json - Swagger documentation for REST API
+
+set -o errexit
+
+GOPATH=$(go env GOPATH)
+PATH=${GOPATH}/bin:${PATH}
+GRPC_GATEWAY_VERSION="1.16.0"
+
+# Prints path to subdirectory if it exist, otherwise prints nothing
+find_subdir_safely() {
+    local DIR=$1
+    local NAME_PATTERN=$2
+    if [ -d "$DIR" ]; then
+        find "$DIR" -name "$NAME_PATTERN" | head -n 1
+    fi
+}
+
+# Prints path to grpc-gateway source code directory
+find_grpc_gateway_dir() {
+    local GO_GET_PATH=${GOPATH}/src/github.com/grpc-ecosystem/grpc-gateway/
+    local GO_MOD_PATH="${GOPATH}/pkg/mod/github.com/grpc-ecosystem/grpc-gateway@v${GRPC_GATEWAY_VERSION}"
+
+    if [ -d "$GO_MOD_PATH" ]; then
+        echo "$GO_MOD_PATH"
+    elif [ -d "$GO_GET_PATH" ]; then
+        echo "$GO_GET_PATH"
+    else
+        echo 'error: cannot find grpc-gateway dir, install it with go-get' 1>&2
+        exit 1
+    fi
+}
+
+# Prints and calls given command
+echo_call() {
+    echo "$@"
+    "$@"
+}
+
+GPRC_GATEWAY_DIR=$(find_grpc_gateway_dir)
+
+generate_proto() {
+    local PROTO_PATH=$1
+    if [ ! -f "$PROTO_PATH" ]; then
+        echo "proto file '$PROTO_PATH' not exist" 1>&2
+        exit 1
+    fi
+
+    local PROTOC_INCLUDE_PATH
+    PROTOC_INCLUDE_PATH=$(which protoc)
+    PROTOC_INCLUDE_PATH=${PROTOC_INCLUDE_PATH%"/bin/protoc"}/include
+
+    local PROTO_DIR
+    local PROTO_NAME
+    PROTO_DIR=$(dirname "$PROTO_PATH")
+    PROTO_NAME=$(basename "$PROTO_PATH")
+
+    echo_call protoc \
+        "-I${PROTOC_INCLUDE_PATH}" \
+        "-I${GOPATH}/src" \
+        "-I${GPRC_GATEWAY_DIR}/third_party/googleapis" \
+        "-I${GPRC_GATEWAY_DIR}"\
+        "-I${PROTO_DIR}" \
+        "--go_out=plugins=grpc:${PROTO_DIR}" \
+        "--grpc-gateway_out=logtostderr=true:${PROTO_DIR}" \
+        "--swagger_out=simple_operation_ids=true,logtostderr=true:${PROTO_DIR}" \
+        "${PROTO_DIR}/${PROTO_NAME}"
+
+}
+
+for PROTO_PATH in "$@"
+do
+    generate_proto "$PROTO_PATH"
+done

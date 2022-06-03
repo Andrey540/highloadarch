@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS user_conversation
 
 CREATE TABLE IF NOT EXISTS message
 (
-    id              INT PRIMARY KEY,
+    id              binary(16) NOT NULL PRIMARY KEY,
     user_id         binary(16) NOT NULL,
     conversation_id binary(16) NOT NULL,
     text            MEDIUMTEXT        DEFAULT NULL,
@@ -32,4 +32,23 @@ CREATE TABLE IF NOT EXISTS message
     CHARACTER SET = utf8mb4
     COLLATE utf8mb4_unicode_ci
 ;
+
+CREATE TABLE IF NOT EXISTS stored_event
+(
+    id     binary(16) PRIMARY KEY,
+    status INT          NOT NULL,
+    type   VARCHAR(255) NOT NULL,
+    body   JSON         NOT NULL,
+    INDEX  `status_idx` (`status`)
+);
+
+CREATE TABLE IF NOT EXISTS processed_event
+(
+    id binary(16) NOT NULL PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS processed_command
+(
+    id binary(16) NOT NULL PRIMARY KEY
+);
 

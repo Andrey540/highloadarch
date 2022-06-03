@@ -3,6 +3,8 @@ package sql
 import (
 	"context"
 	"database/sql"
+
+	"github.com/pkg/errors"
 )
 
 type Client interface {
@@ -47,7 +49,7 @@ func (t *transactionalClient) BeginTransaction() (Transaction, error) {
 func (t *transactionalClient) Connection(ctx context.Context) (TransactionalConnection, error) {
 	connx, err := t.Conn(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return &transactionalConnection{Conn: connx}, nil

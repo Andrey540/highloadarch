@@ -18,9 +18,9 @@ func BeginTransaction(client TransactionalClient, lockNames []string) (Transacti
 			if err != nil {
 				err2 := transaction.Rollback()
 				if err2 != nil {
-					return nil, nil, errors.Wrap(err, err2.Error())
+					return nil, nil, errors.WithStack(errors.Wrap(err, err2.Error()))
 				}
-				return nil, nil, err
+				return nil, nil, errors.WithStack(err)
 			}
 		}
 		locks = append(locks, lock)

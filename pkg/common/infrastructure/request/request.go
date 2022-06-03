@@ -1,17 +1,17 @@
 package request
 
 import (
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/server"
 	"github.com/gorilla/mux"
 
 	"net/http"
 )
 
 const (
-	UserIDHeader   = "X-AuthorID"
-	userRoleHeader = "X-Role"
-	Customer       = "customer"
-	Admin          = "admin"
+	UserIDHeader    = "X-AuthorID"
+	userRoleHeader  = "X-Role"
+	RequestIDHeader = "X-Request-Id"
+	Customer        = "customer"
+	Admin           = "admin"
 )
 
 func GetIDFromRequest(r *http.Request) string {
@@ -19,7 +19,7 @@ func GetIDFromRequest(r *http.Request) string {
 	return vars["id"]
 }
 
-func GetUserIDFromHeader(r *http.Request) string {
+func GetUserIDFromRequest(r *http.Request) string {
 	return r.Header.Get(UserIDHeader)
 }
 
@@ -28,5 +28,5 @@ func GetUserRoleFromHeader(r *http.Request) string {
 }
 
 func GetRequestIDFromRequest(r *http.Request) string {
-	return r.Header.Get(server.RequestIDHeader)
+	return r.Header.Get(RequestIDHeader)
 }

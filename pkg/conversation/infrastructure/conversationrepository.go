@@ -36,7 +36,7 @@ func (r conversationRepository) GetUserConversation(userID, target uuid.UUID) (*
 	var conversationID uuid.UUID
 	err = rows.Scan(&conversationID)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	sqlQuery = `SELECT id, data FROM conversation WHERE id=?`
 	rows, err = r.client.Query(sqlQuery, commonsql.BinaryUUID(conversationID))
@@ -91,12 +91,12 @@ func scanConversation(rows *sql.Rows) (*app.Conversation, error) {
 	var usersStr string
 	err := rows.Scan(&conversation.ID, &usersStr)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	var users []string
 	err = json.Unmarshal([]byte(usersStr), &users)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	for _, id := range users {
 		uid, err1 := uuid.FromString(id)

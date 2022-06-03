@@ -19,6 +19,6 @@ type PostDTO struct {
 
 type NewsLineQueryService interface {
 	ListPosts(userID uuid.UUID) ([]*PostDTO, error)
-	ListNews(userID uuid.UUID) (*[]NewsLineItem, error)
+	ListNews(userID uuid.UUID) ([]*NewsLineItem, error)
 	GetPost(postID uuid.UUID) (*PostDTO, error)
 }

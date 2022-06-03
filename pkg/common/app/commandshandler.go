@@ -1,18 +1,9 @@
 package app
 
 import (
-	"fmt"
-
 	"github.com/callicoder/go-docker/pkg/common/uuid"
 	"github.com/pkg/errors"
 )
-
-const (
-	commandLockName = "command-%s"
-)
-
-var ErrCommandAlreadyProcessed = errors.New("Command already processed")
-var ErrCommandHandlerNotFound = errors.New("Command handler not found")
 
 func NewCommandsHandler(unitOfWorkFactory UnitOfWorkFactory, commandHandlerFactory CommandHandlerFactory) CommandHandler {
 	return &handler{unitOfWorkFactory: unitOfWorkFactory, commandHandlerFactory: commandHandlerFactory}
@@ -68,19 +59,15 @@ func (handler *handler) executeUnitOfWork(f func(UnitOfWork) (interface{}, error
 	unitOfWork, err = handler.unitOfWorkFactory.NewUnitOfWork(lockNames)
 	result = nil
 	if err != nil {
-		return result, err
+		return result, errors.WithStack(err)
 	}
 	defer func() {
 		err = unitOfWork.Complete(err)
 	}()
 	result, err = f(unitOfWork)
-	return result, err
+	return result, errors.WithStack(err)
 }
 
 func (handler *handler) getCommandLockName(commandID string) string {
-	if commandID == "" {
-		return ""
-	}
-
-	return fmt.Sprintf(commandLockName, commandID)
+	return ""
 }

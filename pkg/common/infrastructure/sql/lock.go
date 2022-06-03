@@ -24,7 +24,7 @@ type Lock struct {
 }
 
 func (l *Lock) Acquire() error {
-	const sqlQuery = "SELECT GET_LOCK(SUBSTRING(CONCAT(?, '.', DATABASE()), 1, 64), ?)"
+	const sqlQuery = "SELECT GET_LOCK(SUBSTRING(?, 1, 64), ?)"
 	var result sql.NullInt32
 	rows, err := l.client.Query(sqlQuery, l.lockName, l.timeoutSeconds)
 	if err != nil {
@@ -33,7 +33,10 @@ func (l *Lock) Acquire() error {
 	if rows.Err() != nil {
 		return errors.WithStack(rows.Err())
 	}
-	err = rows.Scan(result)
+	if !rows.Next() {
+		return errors.WithStack(ErrLockTimeout)
+	}
+	err = rows.Scan(&result)
 	if result.Int32 == 0 && err == nil {
 		return errors.WithStack(ErrLockTimeout)
 	}
@@ -42,7 +45,7 @@ func (l *Lock) Acquire() error {
 }
 
 func (l *Lock) Release() error {
-	const sqlQuery = "SELECT RELEASE_LOCK(SUBSTRING(CONCAT(?, '.', DATABASE()), 1, 64))"
+	const sqlQuery = "SELECT RELEASE_LOCK(SUBSTRING(?, 1, 64))"
 	var result sql.NullInt32
 	rows, err := l.client.Query(sqlQuery, l.lockName)
 	if err != nil {
@@ -51,7 +54,10 @@ func (l *Lock) Release() error {
 	if rows.Err() != nil {
 		return errors.WithStack(rows.Err())
 	}
-	err = rows.Scan(result)
+	if !rows.Next() {
+		return errors.WithStack(ErrLockTimeout)
+	}
+	err = rows.Scan(&result)
 	if err == nil {
 		if !result.Valid {
 			return ErrLockNotFound

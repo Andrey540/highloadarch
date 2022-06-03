@@ -52,7 +52,7 @@ func (s *service) startRedis(cfg *Config) error {
 		Password: cfg.Password,
 	})
 	if client == nil {
-		return errNilRedisClient
+		return errors.WithStack(errNilRedisClient)
 	}
 	_, err := client.Ping().Result()
 	if err != nil {
@@ -75,12 +75,12 @@ func (s *service) GetUserSession(sessionKey string) (*UserSession, error) {
 		var session UserSession
 		err1 := json.Unmarshal([]byte(res), &session)
 		if err1 != nil {
-			return nil, err1
+			return nil, errors.WithStack(err1)
 		}
 		_, err1 = s.redisClient.Set(sessionKey, res, s.sessionExpirationTime).Result()
 		return &session, errors.WithStack(err1)
 	default:
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 }
 
@@ -90,7 +90,7 @@ func (s *service) SaveSession(userID string) (string, error) {
 		UserID: userID,
 	})
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	_, err = s.redisClient.Set(sessionKey, res, s.sessionExpirationTime).Result()
 	return sessionKey, errors.WithStack(err)

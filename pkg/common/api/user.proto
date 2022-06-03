@@ -1,0 +1,259 @@
+syntax = "proto3";
+package api;
+
+option go_package = "./;conversation";
+option php_namespace = "Api\\Grpc\\Conversation";
+option php_metadata_namespace = "Api\\Grpc\\Conversation";
+
+// Annotations required for gprc-gateway which transforms GRPC into REST API
+// See https://grpc-ecosystem.github.io/grpc-gateway/
+import "google/api/annotations.proto";
+import "protoc-gen-swagger/options/annotations.proto";
+import "google/protobuf/empty.proto";
+
+service User {
+  rpc SignIn (SignInRequest) returns (SignInResponse) {
+    option (google.api.http) = {
+      post: "/user/api/v1/signin"
+      body: "*"
+    };
+  }
+
+  rpc RegisterUser (RegisterUserRequest) returns (RegisterUserResponse) {
+    option (google.api.http) = {
+      post: "/user/api/v1/register"
+      body: "*"
+    };
+  }
+
+  rpc GetProfile (GetProfileRequest) returns (GetProfileResponse) {
+    option (google.api.http) = {
+      get: "/user/api/v1/register"
+    };
+  }
+
+  rpc UpdateUser (UpdateUserRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/user/api/v1/update"
+      body: "*"
+    };
+  }
+
+  rpc DeleteUser (DeleteUserRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/user/api/v1/delete"
+      body: "*"
+    };
+  }
+
+  rpc FindProfiles (FindProfilesRequest) returns (FindProfilesResponse) {
+    option (google.api.http) = {
+      get: "/user/api/v1/profile/find"
+    };
+  }
+
+  rpc AddFriend (AddFriendRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/user/api/v1/friend/add"
+      body: "*"
+    };
+  }
+
+  rpc RemoveFriend (RemoveFriendRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/user/api/v1/friend/remove"
+      body: "*"
+    };
+  }
+
+  rpc ListFriends (ListFriendsRequest) returns (ListFriendsResponse) {
+    option (google.api.http) = {
+      get: "/user/api/v1/friend/list"
+    };
+  }
+
+  rpc ListUsers (ListUsersRequest) returns (ListUsersResponse) {
+    option (google.api.http) = {
+      post: "/user/api/v1/list"
+      body: "*"
+    };
+  }
+}
+
+message SignInRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["userName", "password"]
+    }
+  };
+  string userName = 1;
+  string password = 2;
+}
+
+message SignInResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["userID"]
+    }
+  };
+  string userID = 1;
+}
+
+message RegisterUserRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["userName", "firstName", "lastName", "age", "sex", "interests", "city", "password"]
+    }
+  };
+  string userName = 1;
+  string firstName = 2;
+  string lastName = 3;
+  uint32 age = 4;
+  uint32 sex = 5;
+  string interests = 6;
+  string city = 7;
+  string password = 8;
+}
+
+message RegisterUserResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["userID"]
+    }
+  };
+  string userID = 1;
+}
+
+message UpdateUserRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["userName", "firstName", "lastName", "age", "sex", "interests", "city", "password"]
+    }
+  };
+  string userName = 1;
+  string firstName = 2;
+  string lastName = 3;
+  uint32 age = 4;
+  uint32 sex = 5;
+  string interests = 6;
+  string city = 7;
+  string password = 8;
+}
+
+message DeleteUserRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["userID"]
+    }
+  };
+  string userID = 1;
+}
+
+message GetProfileRequest {
+  string userID = 1 [(grpc.gateway.protoc_gen_swagger.options.openapiv2_field) = {required: ["userID"];}];
+}
+
+message GetProfileResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["user"]
+    }
+  };
+  UserData user = 1;
+}
+
+message FindProfilesRequest {
+  string userName = 1 [(grpc.gateway.protoc_gen_swagger.options.openapiv2_field) = {required: ["userName"];}];
+}
+
+message FindProfilesResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["users"]
+    }
+  };
+  repeated UserData users = 1;
+}
+
+message AddFriendRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["userID"]
+    }
+  };
+  string userID = 1;
+}
+
+message RemoveFriendRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["userID"]
+    }
+  };
+  string userID = 1;
+}
+
+message ListFriendsRequest {
+  string userID = 1 [(grpc.gateway.protoc_gen_swagger.options.openapiv2_field) = {required: ["userID"];}];
+}
+
+message ListFriendsResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["friends"]
+    }
+  };
+  repeated Friend friends = 1;
+}
+
+message ListUsersRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {};
+  repeated string userIDs = 1;
+}
+
+message ListUsersResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["users"]
+    }
+  };
+  repeated UserListItem users = 1;
+}
+
+message UserData {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["Id", "userName", "firstName", "lastName", "age", "sex", "interests", "city", "password"]
+    }
+  };
+  string Id = 1;
+  string userName = 2;
+  string firstName = 3;
+  string lastName = 4;
+  uint32 age = 5;
+  uint32 sex = 6;
+  string interests = 7;
+  string city = 8;
+  string password = 9;
+}
+
+message Friend {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["userID", "userName"]
+    }
+  };
+  string userID = 1;
+  string userName = 2;
+}
+
+message UserListItem {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["userID", "userName", "isFriend"]
+    }
+  };
+  string userID = 1;
+  string userName = 2;
+  bool isFriend = 3;
+}
