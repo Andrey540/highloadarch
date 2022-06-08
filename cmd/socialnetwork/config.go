@@ -24,7 +24,6 @@ type config struct {
 
 	MigrationsDir string `envconfig:"migrations_dir"`
 
-	ServiceHost                    string `envconfig:"service_host" default:"http://socialnetwork:80"`
 	ServeRESTAddress               string `envconfig:"serve_rest_address" default:":80"`
 	UserServiceRESTAddress         string `envconfig:"user_service_rest_address" default:"http://user:80"`
 	UserServiceGRPCAddress         string `envconfig:"user_service_grpc_address" default:"user:81"`
