@@ -51,15 +51,15 @@ func (u *unitOfWork) UserProvider() app.UserProvider {
 }
 
 func (u *unitOfWork) EventStore() commonapp.EventStore {
-	return event.NewEventStore(u.transaction)
+	return event.NewEventStore(u.transaction, "")
 }
 
 func (u *unitOfWork) ProcessedEventStore() commonapp.ProcessedEventStore {
-	return event.NewProcessedEventStore(u.transaction)
+	return event.NewProcessedEventStore(u.transaction, "")
 }
 
 func (u *unitOfWork) ProcessedCommandStore() commonapp.ProcessedCommandStore {
-	return command.NewProcessedCommandStore(u.transaction)
+	return command.NewProcessedCommandStore(u.transaction, "")
 }
 
 func (u *unitOfWork) GetLocks(lockNames []string) error {

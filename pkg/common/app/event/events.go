@@ -15,6 +15,8 @@ const (
 
 	ConversationCreatedEvent = "conversation.created"
 	MessageAddedEvent        = "conversation.message_added"
+	MessagesReadEvent        = "conversation.messages_read"
+	UnreadMessageAddedEvent  = "conversation.unread_message_added"
 
 	PostCreatedEvent = "post.created"
 )
@@ -97,10 +99,11 @@ func (event ConversationCreated) RoutingID() string {
 }
 
 type MessageAdded struct {
-	MessageID      string `json:"message_id"`
-	ConversationID string `json:"conversation_id"`
-	UserID         string `json:"user_id"`
-	Text           string `json:"text"`
+	MessageID      string   `json:"message_id"`
+	ConversationID string   `json:"conversation_id"`
+	AuthorID       string   `json:"author_id"`
+	UserIDs        []string `json:"users"`
+	Text           string   `json:"text"`
 }
 
 func (event MessageAdded) EventType() string {
@@ -108,6 +111,33 @@ func (event MessageAdded) EventType() string {
 }
 
 func (event MessageAdded) RoutingID() string {
+	return event.AuthorID
+}
+
+type UnreadMessageAdded struct {
+	ConversationID string `json:"conversation_id"`
+	UserID         string `json:"user_id"`
+}
+
+func (event UnreadMessageAdded) EventType() string {
+	return UnreadMessageAddedEvent
+}
+
+func (event UnreadMessageAdded) RoutingID() string {
+	return event.UserID
+}
+
+type MessagesRead struct {
+	UserID         string   `json:"user_id"`
+	ConversationID string   `json:"conversation_id"`
+	MessageIDs     []string `json:"messages"`
+}
+
+func (event MessagesRead) EventType() string {
+	return MessagesReadEvent
+}
+
+func (event MessagesRead) RoutingID() string {
 	return event.UserID
 }
 

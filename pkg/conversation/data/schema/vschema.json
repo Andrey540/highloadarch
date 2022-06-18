@@ -1,14 +1,6 @@
 {
 	"sharded": true,
 	"tables": {
-		"schema_migrations": {
-			"column_vindexes": [
-				{
-					"column": "version",
-					"name": "hash"
-				}
-			]
-		},
 		"conversation": {
 			"column_vindexes": [
 				{
@@ -29,6 +21,38 @@
 			"column_vindexes": [
 				{
 					"column": "user_id",
+					"name": "binary_md5_vdx"
+				}
+			]
+		},
+		"user_unread_message": {
+			"column_vindexes": [
+				{
+					"column": "conversation_id",
+					"name": "binary_md5_vdx"
+				}
+			]
+		},
+		"stored_event": {
+			"column_vindexes": [
+				{
+					"column": "id",
+					"name": "binary_md5_vdx"
+				}
+			]
+		},
+		"processed_event": {
+			"column_vindexes": [
+				{
+					"column": "id",
+					"name": "binary_md5_vdx"
+				}
+			]
+		},
+		"processed_command": {
+			"column_vindexes": [
+				{
+					"column": "id",
 					"name": "binary_md5_vdx"
 				}
 			]

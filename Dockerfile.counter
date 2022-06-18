@@ -1,0 +1,16 @@
+FROM alpine:latest
+
+RUN addgroup -g 1001 -S microuser && adduser -u 1001 -S microuser  -G microuser
+
+ADD ./bin/counter /app/bin/
+WORKDIR /app
+
+ADD ./pkg/counter/data/migrations /data/mysql/migrations
+ADD ./pkg/counter/data/schema/vschema.json /data/vitess/schema/vschema.json
+ENV MIGRATIONS_DIR=/data/mysql/migrations
+ENV VSCHEMA_PATH=/data/vitess/schema/vschema.json
+
+EXPOSE 8000
+
+USER microuser
+CMD ["./bin/counter"]

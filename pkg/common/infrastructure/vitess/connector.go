@@ -28,7 +28,6 @@ type Config struct {
 	MaxConnections     int
 	ConnectionLifetime time.Duration
 	ConnectTimeout     time.Duration // 0 means default timeout (15 seconds)
-	Database           string
 }
 
 type Connector interface {

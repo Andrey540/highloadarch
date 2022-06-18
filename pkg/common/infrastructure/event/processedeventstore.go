@@ -9,16 +9,17 @@ import (
 
 type processedEventStore struct {
 	client commonsql.Client
+	dbName string
 }
 
 func (store *processedEventStore) Store(processedEvent app.ProcessedEvent) error {
-	const query = `INSERT INTO processed_event (id) VALUES (?);`
+	query := `INSERT INTO ` + store.dbName + `processed_event (id) VALUES (?);`
 	_, err := store.client.Exec(query, commonsql.BinaryUUID(processedEvent.ID))
 	return errors.WithStack(err)
 }
 
 func (store *processedEventStore) GetEvent(id uuid.UUID) (*app.ProcessedEvent, error) {
-	query := "SELECT id FROM processed_event WHERE id = ?"
+	query := `SELECT id FROM ` + store.dbName + `processed_event WHERE id = ?`
 	var event sqlxProcessedEvent
 	rows, err := store.client.Query(query, commonsql.BinaryUUID(id))
 	if err != nil {
@@ -39,8 +40,11 @@ func (store *processedEventStore) GetEvent(id uuid.UUID) (*app.ProcessedEvent, e
 	return &result, nil
 }
 
-func NewProcessedEventStore(client commonsql.Client) app.ProcessedEventStore {
-	return &processedEventStore{client: client}
+func NewProcessedEventStore(client commonsql.Client, dbName string) app.ProcessedEventStore {
+	if dbName != "" {
+		dbName += "."
+	}
+	return &processedEventStore{client: client, dbName: dbName}
 }
 
 type sqlxProcessedEvent struct {

@@ -3,6 +3,7 @@ package command
 const (
 	StartConversationCommand = "conversation.start"
 	AddMessageCommand        = "conversation.add_message"
+	ReadMessagesCommand      = "conversation.read_messages"
 )
 
 type StartUserConversation struct {
@@ -31,5 +32,20 @@ func (command AddMessage) CommandType() string {
 }
 
 func (command AddMessage) CommandID() string {
+	return command.ID
+}
+
+type ReadMessages struct {
+	ID             string   `json:"id"`
+	ConversationID string   `json:"conversation_id"`
+	UserID         string   `json:"user_id"`
+	Messages       []string `json:"messages"`
+}
+
+func (command ReadMessages) CommandType() string {
+	return ReadMessagesCommand
+}
+
+func (command ReadMessages) CommandID() string {
 	return command.ID
 }

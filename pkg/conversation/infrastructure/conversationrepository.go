@@ -38,8 +38,12 @@ func (r conversationRepository) GetUserConversation(userID, target uuid.UUID) (*
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	sqlQuery = `SELECT id, data FROM conversation WHERE id=?`
-	rows, err = r.client.Query(sqlQuery, commonsql.BinaryUUID(conversationID))
+	return r.Find(conversationID)
+}
+
+func (r conversationRepository) Find(conversationID uuid.UUID) (*app.Conversation, error) {
+	sqlQuery := `SELECT id, data FROM conversation WHERE id=?`
+	rows, err := r.client.Query(sqlQuery, commonsql.BinaryUUID(conversationID))
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

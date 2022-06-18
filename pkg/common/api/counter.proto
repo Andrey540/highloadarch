@@ -1,0 +1,47 @@
+syntax = "proto3";
+package api;
+
+option go_package = "./;conversation";
+option php_namespace = "Api\\Grpc\\Conversation";
+option php_metadata_namespace = "Api\\Grpc\\Conversation";
+
+// Annotations required for gprc-gateway which transforms GRPC into REST API
+// See https://grpc-ecosystem.github.io/grpc-gateway/
+import "google/api/annotations.proto";
+import "protoc-gen-swagger/options/annotations.proto";
+
+service Counter {
+  rpc ListUserUnreadMessages (ListUserUnreadMessagesRequest) returns (ListUserUnreadMessagesResponse) {
+    option (google.api.http) = {
+      get: "/conversation/api/v1/list"
+    };
+  }
+}
+
+message ListUserUnreadMessagesRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["user"]
+    }
+  };
+  string user = 1;
+}
+
+message ListUserUnreadMessagesResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["unreadMessages"]
+    }
+  };
+  repeated UnreadMessage unreadMessages = 1;
+}
+
+message UnreadMessage {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["conversationID", "count"]
+    }
+  };
+  string conversationID = 1;
+  int64 count = 2;
+}

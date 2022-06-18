@@ -8,6 +8,7 @@ import (
 type RepositoryFactory interface {
 	ConversationRepository() ConversationRepository
 	MessageRepository() MessageRepository
+	UnreadMessagesRepository() UnreadMessagesRepository
 }
 
 type UnitOfWork interface {
@@ -33,7 +34,8 @@ func (f serviceFactory) CreateConversationService() ConversationService {
 	eventDispatcher := f.createEventDispatcher()
 	conversationRepository := f.unitOfWork.ConversationRepository()
 	messageRepository := f.unitOfWork.MessageRepository()
-	return NewConversationService(conversationRepository, messageRepository, eventDispatcher)
+	unreadMessageRepository := f.unitOfWork.UnreadMessagesRepository()
+	return NewConversationService(conversationRepository, messageRepository, unreadMessageRepository, eventDispatcher)
 }
 
 func (f serviceFactory) createEventDispatcher() event.Dispatcher {

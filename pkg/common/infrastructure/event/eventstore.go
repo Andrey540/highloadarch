@@ -10,6 +10,7 @@ import (
 
 type eventStore struct {
 	client sql.Client
+	dbName string
 }
 
 func (store *eventStore) NewUID() uuid.UUID {
@@ -17,14 +18,14 @@ func (store *eventStore) NewUID() uuid.UUID {
 }
 
 func (store *eventStore) Store(storedEvent app.StoredEvent) error {
-	const query = `INSERT INTO stored_event (id, status, type, body) VALUES (?, ?, ?, ?)
+	query := `INSERT INTO ` + store.dbName + `stored_event (id, status, type, body) VALUES (?, ?, ?, ?)
                    ON DUPLICATE KEY UPDATE status=VALUES(status);`
 	_, err := store.client.Exec(query, sql.BinaryUUID(storedEvent.ID), storedEvent.Status, storedEvent.Type, storedEvent.Body)
-	return err
+	return errors.WithStack(err)
 }
 
 func (store *eventStore) GetCreated() ([]app.StoredEvent, error) {
-	query := "SELECT id, status, type, body FROM stored_event WHERE status = ? ORDER BY id"
+	query := `SELECT id, status, type, body FROM ` + store.dbName + `stored_event WHERE status = ? ORDER BY id`
 	rows, err := store.client.Query(query, app.Created)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -46,6 +47,9 @@ func (store *eventStore) GetCreated() ([]app.StoredEvent, error) {
 	return result, nil
 }
 
-func NewEventStore(client sql.Client) app.EventStore {
-	return &eventStore{client: client}
+func NewEventStore(client sql.Client, dbName string) app.EventStore {
+	if dbName != "" {
+		dbName += "."
+	}
+	return &eventStore{client: client, dbName: dbName}
 }

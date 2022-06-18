@@ -25,6 +25,14 @@
 				}
 			]
 		},
+		"user_unread_message": {
+			"column_vindexes": [
+				{
+					"column": "conversation_id",
+					"name": "binary_md5_vdx"
+				}
+			]
+		},
 		"stored_event": {
 			"column_vindexes": [
 				{

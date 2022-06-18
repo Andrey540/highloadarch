@@ -1,0 +1,18 @@
+{{template "authorizedLayout" .}}
+
+{{define "header"}}{{end}}
+{{define "title"}}Sign Up{{end}}
+
+{{define "main"}}
+<div class="row">
+    <h2>
+        Conversations
+    </h2>
+</div>
+{{range .Conversations}}
+<div class="row">
+    <a class="username" href="/app/conversation/user/{{.UserID}}">{{.Username}}</a><span> ({{.UnreadMessages}})</span>
+</div>
+{{end}}
+{{end}}
+{{define "script"}}{{end}}

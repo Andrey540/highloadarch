@@ -29,6 +29,8 @@ type config struct {
 	UserServiceGRPCAddress         string `envconfig:"user_service_grpc_address" default:"user:81"`
 	ConversationServiceRESTAddress string `envconfig:"conversation_service_rest_address" default:"http://conversation:80"`
 	ConversationServiceGRPCAddress string `envconfig:"conversation_service_grpc_address" default:"conversation:81"`
+	CounterServiceRESTAddress      string `envconfig:"counter_service_rest_address" default:"http://counter:80"`
+	CounterServiceGRPCAddress      string `envconfig:"counter_service_grpc_address" default:"counter:81"`
 	PostServiceRESTAddress         string `envconfig:"post_service_rest_address" default:"http://post:80"`
 	PostServiceGRPCAddress         string `envconfig:"post_service_grpc_address" default:"post:81"`
 }

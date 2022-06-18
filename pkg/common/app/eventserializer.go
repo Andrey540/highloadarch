@@ -68,6 +68,14 @@ func (s *serializer) Deserialize(eventType, msg string) (result event.Event, err
 		currentEvent := event.MessageAdded{}
 		err = json.Unmarshal(body.Payload, &currentEvent)
 		result = currentEvent
+	case event.MessagesReadEvent:
+		currentEvent := event.MessagesRead{}
+		err = json.Unmarshal(body.Payload, &currentEvent)
+		result = currentEvent
+	case event.UnreadMessageAddedEvent:
+		currentEvent := event.UnreadMessageAdded{}
+		err = json.Unmarshal(body.Payload, &currentEvent)
+		result = currentEvent
 	case event.PostCreatedEvent:
 		currentEvent := event.PostCreated{}
 		err = json.Unmarshal(body.Payload, &currentEvent)

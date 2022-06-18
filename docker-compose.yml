@@ -159,7 +159,7 @@ services:
       - "${PWD}/centrifugo:/centrifugo"
 
   socialnetwork-1:
-    image: "andrey540/socialnetwork:v9"
+    image: "andrey540/socialnetwork:v10"
     container_name: socialnetwork-1
     environment:
       REDIS_HOST: redis
@@ -168,6 +168,8 @@ services:
       USER_SERVICE_GRPC_ADDRESS: user:81
       CONVERSATION_SERVICE_REST_ADDRESS: http://conversation:80
       CONVERSATION_SERVICE_GRPC_ADDRESS: conversation:81
+      COUNTER_SERVICE_REST_ADDRESS: http://counter:80
+      COUNTER_SERVICE_GRPC_ADDRESS: counter:81
       POST_SERVICE_REST_ADDRESS: http://post:80
       POST_SERVICE_GRPC_ADDRESS: post:81
       REALTIME_HOSTS: '[
@@ -181,7 +183,7 @@ services:
       - redis
 
   socialnetwork-2:
-    image: "andrey540/socialnetwork:v9"
+    image: "andrey540/socialnetwork:v10"
     container_name: socialnetwork-2
     environment:
       REDIS_HOST: redis
@@ -190,6 +192,8 @@ services:
       USER_SERVICE_GRPC_ADDRESS: user:81
       CONVERSATION_SERVICE_REST_ADDRESS: http://conversation:80
       CONVERSATION_SERVICE_GRPC_ADDRESS: conversation:81
+      COUNTER_SERVICE_REST_ADDRESS: http://counter:80
+      COUNTER_SERVICE_GRPC_ADDRESS: counter:81
       POST_SERVICE_REST_ADDRESS: http://post:80
       POST_SERVICE_GRPC_ADDRESS: post:81
       REALTIME_HOSTS: '[
@@ -203,7 +207,7 @@ services:
       - redis
 
   user:
-    image: "andrey540/user:v9"
+    image: "andrey540/user:v10"
     container_name: user
     environment:
       DB_MASTER_HOST: mysql-node-1
@@ -223,7 +227,7 @@ services:
       - haproxy
 
   conversation:
-    image: "andrey540/conversation:v9"
+    image: "andrey540/conversation:v10"
     container_name: conversation
     environment:
       SCHEMA_HOST: vtctld
@@ -234,6 +238,38 @@ services:
       DB_USER: socialnetwork
       DB_PASSWORD: passwd
       DB_MAX_CONN: 50
+      AMQP_HOST: rabbitmq
+      AMQP_USER: guest
+      AMQP_PASSWORD: guest
+      AMQP_ENABLED: 1
+      SERVE_REST_ADDRESS: :80
+      SERVE_GRPC_ADDRESS: :81
+    healthcheck:
+      interval: 30s
+      retries: 15
+      test:
+        - CMD-SHELL
+        - wget -nv -t1 --spider localhost:80/health
+    depends_on:
+      - vtgate
+      - vtctld
+
+  counter:
+    image: "andrey540/counter:v10"
+    container_name: counter
+    environment:
+      SCHEMA_HOST: vtctld
+      SCHEMA_PORT: 15999
+      DB_HOST: vtgate
+      DB_PORT: 15999
+      DB_NAME: counter_keyspace
+      DB_USER: socialnetwork
+      DB_PASSWORD: passwd
+      DB_MAX_CONN: 50
+      AMQP_HOST: rabbitmq
+      AMQP_USER: guest
+      AMQP_PASSWORD: guest
+      AMQP_ENABLED: 1
       SERVE_REST_ADDRESS: :80
       SERVE_GRPC_ADDRESS: :81
     healthcheck:
@@ -247,7 +283,7 @@ services:
       - vtctld
 
   post:
-    image: "andrey540/post:v9"
+    image: "andrey540/post:v10"
     container_name: post
     environment:
       TARANTOOL_HOST: tarantool
@@ -275,7 +311,7 @@ services:
       - mysql-post
 
   post-worker-1:
-    image: "andrey540/post:v9"
+    image: "andrey540/post:v10"
     container_name: post-worker-1
     environment:
       TARANTOOL_HOST: tarantool
@@ -309,7 +345,7 @@ services:
       - realtime-2
 
   post-worker-2:
-    image: "andrey540/post:v9"
+    image: "andrey540/post:v10"
     container_name: post-worker-2
     environment:
       TARANTOOL_HOST: tarantool
@@ -380,6 +416,7 @@ services:
       - /script/schemaload.sh
     depends_on:
       - vttablet101
+      - vttablet102
     environment:
       - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
         -topo_global_root vitess/global
@@ -391,6 +428,30 @@ services:
       - SLEEPTIME=15
       - VSCHEMA_FILE=conversation_keyspace_vschema.json
       - SCHEMA_FILES=conversation_keyspace_schema_file.sql
+      - POST_LOAD_FILE=
+      - EXTERNAL_DB=0
+    image: vitess/lite:${VITESS_TAG:-latest}
+    volumes:
+      - "${PWD}/vitess:/script"
+
+  schemaload_counter_keyspace:
+    command:
+      - sh
+      - -c
+      - /script/schemaload.sh
+    depends_on:
+      - vttablet201
+    environment:
+      - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+        -topo_global_root vitess/global
+      - WEB_PORT=8080
+      - GRPC_PORT=15999
+      - CELL=test
+      - KEYSPACE=counter_keyspace
+      - TARGETTAB=test-0000000201
+      - SLEEPTIME=15
+      - VSCHEMA_FILE=counter_keyspace_vschema.json
+      - SCHEMA_FILES=counter_keyspace_schema_file.sql
       - POST_LOAD_FILE=
       - EXTERNAL_DB=0
     image: vitess/lite:${VITESS_TAG:-latest}
@@ -439,7 +500,9 @@ services:
     depends_on:
       - vtctld
       - vtorc
+      - vttablet101
       - vttablet102
+      - vttablet201
     image: vitess/lite:${VITESS_TAG:-latest}
     ports:
       - 15099:8080
@@ -538,6 +601,44 @@ services:
     image: vitess/lite:${VITESS_TAG:-latest}
     ports:
       - 15102:8080
+      - "15999"
+      - "3306"
+    volumes:
+      - "${PWD}/vitess:/script"
+
+  vttablet201:
+    command:
+      - sh
+      - -c
+      - /script/vttablet-up.sh 201
+    depends_on:
+      - vtctld
+    environment:
+      - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
+        -topo_global_root vitess/global
+      - WEB_PORT=8080
+      - GRPC_PORT=15999
+      - CELL=test
+      - KEYSPACE=counter_keyspace
+      - SHARD=-
+      - ROLE=primary
+      - VTHOST=vttablet201
+      - EXTERNAL_DB=0
+      - DB_PORT=
+      - DB_HOST=
+      - DB_USER=
+      - DB_PASS=
+      - DB_CHARSET=
+    healthcheck:
+      interval: 30s
+      retries: 15
+      test:
+        - CMD-SHELL
+        - curl -s --fail --show-error localhost:8080/debug/health
+      timeout: 10s
+    image: vitess/lite:${VITESS_TAG:-latest}
+    ports:
+      - 15201:8080
       - "15999"
       - "3306"
     volumes:

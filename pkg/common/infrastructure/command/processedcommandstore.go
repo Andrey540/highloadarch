@@ -10,16 +10,17 @@ import (
 
 type processedCommandStore struct {
 	client commonsql.Client
+	dbName string
 }
 
 func (store *processedCommandStore) Store(processedCommand app.ProcessedCommand) error {
-	const query = `INSERT INTO processed_command (id) VALUES (?);`
+	query := `INSERT INTO ` + store.dbName + `processed_command (id) VALUES (?);`
 	_, err := store.client.Exec(query, commonsql.BinaryUUID(processedCommand.ID))
 	return errors.WithStack(err)
 }
 
 func (store *processedCommandStore) GetCommand(id uuid.UUID) (*app.ProcessedCommand, error) {
-	query := "SELECT id FROM processed_command WHERE id = ?"
+	query := `SELECT id FROM ` + store.dbName + `processed_command WHERE id = ?`
 	var command sqlxProcessedCommand
 	rows, err := store.client.Query(query, commonsql.BinaryUUID(id))
 	if err != nil {
@@ -40,8 +41,11 @@ func (store *processedCommandStore) GetCommand(id uuid.UUID) (*app.ProcessedComm
 	return &result, nil
 }
 
-func NewProcessedCommandStore(client commonsql.Client) app.ProcessedCommandStore {
-	return &processedCommandStore{client: client}
+func NewProcessedCommandStore(client commonsql.Client, dbName string) app.ProcessedCommandStore {
+	if dbName != "" {
+		dbName += "."
+	}
+	return &processedCommandStore{client: client, dbName: dbName}
 }
 
 type sqlxProcessedCommand struct {

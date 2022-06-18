@@ -7,6 +7,7 @@ import (
 	"github.com/callicoder/go-docker/pkg/common/uuid"
 	"github.com/callicoder/go-docker/pkg/conversation/app"
 	"github.com/callicoder/go-docker/pkg/conversation/app/command"
+	"github.com/golang/protobuf/ptypes/empty"
 
 	"context"
 )
@@ -30,7 +31,6 @@ func (s *server) StartConversation(ctx context.Context, request *api.StartConver
 		return nil, err
 	}
 	startConversationCommand := command.StartUserConversation{
-		ID:     commonserver.GetRequestIDFromGRPCMetadata(ctx),
 		User:   request.User,
 		Target: request.Target,
 	}
@@ -39,6 +39,26 @@ func (s *server) StartConversation(ctx context.Context, request *api.StartConver
 		return nil, err
 	}
 	return &api.StartConversationResponse{ConversationID: id.(uuid.UUID).String()}, err
+}
+
+func (s *server) ListConversations(ctx context.Context, request *api.ListConversationsRequest) (*api.ListConversationsResponse, error) {
+	err := commonserver.Authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	userID, err := uuid.FromString(request.User)
+	if err != nil {
+		return nil, err
+	}
+	conversations, err := s.queryService.ListConversations(userID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*api.UserConversation, 0, len(conversations))
+	for _, conversation := range conversations {
+		result = append(result, &api.UserConversation{Id: conversation.ID.String(), UserID: conversation.UserID.String()})
+	}
+	return &api.ListConversationsResponse{Conversations: result}, nil
 }
 
 func (s *server) AddMessage(ctx context.Context, request *api.AddMessageRequest) (*api.AddMessageResponse, error) {
@@ -60,6 +80,24 @@ func (s *server) AddMessage(ctx context.Context, request *api.AddMessageRequest)
 	return &api.AddMessageResponse{MessageID: id.(uuid.UUID).String()}, err
 }
 
+func (s *server) ReadMessages(ctx context.Context, request *api.ReadMessagesRequest) (*empty.Empty, error) {
+	err := commonserver.Authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	userID := commonserver.GetUserIDFromGRPCMetadata(ctx)
+	readMessagesCommand := command.ReadMessages{
+		ConversationID: request.ConversationID,
+		UserID:         userID,
+		Messages:       request.Messages,
+	}
+	_, err = s.commandsHandler.Handle(readMessagesCommand)
+	if err != nil {
+		return nil, err
+	}
+	return &empty.Empty{}, err
+}
+
 func (s *server) ListMessages(ctx context.Context, request *api.ListMessagesRequest) (*api.ListMessagesResponse, error) {
 	err := commonserver.Authenticate(ctx)
 	if err != nil {
@@ -69,13 +107,17 @@ func (s *server) ListMessages(ctx context.Context, request *api.ListMessagesRequ
 	if err != nil {
 		return nil, err
 	}
-	messages, err := s.queryService.ListMessages(conversationID)
+	userID, err := uuid.FromString(commonserver.GetUserIDFromGRPCMetadata(ctx))
+	if err != nil {
+		return nil, err
+	}
+	messages, err := s.queryService.ListMessages(userID, conversationID)
 	if err != nil {
 		return nil, err
 	}
 	result := make([]*api.Message, 0, len(messages))
 	for _, message := range messages {
-		result = append(result, &api.Message{Id: message.ID.String(), ConversationID: message.ConversationID.String(), UserID: message.UserID.String(), Text: message.Text})
+		result = append(result, &api.Message{Id: message.ID.String(), ConversationID: message.ConversationID.String(), UserID: message.UserID.String(), Text: message.Text, Unread: message.Unread})
 	}
 	return &api.ListMessagesResponse{Messages: result}, nil
 }

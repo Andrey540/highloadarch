@@ -41,6 +41,36 @@
         ]
       }
     },
+    "/conversation/api/v1/list": {
+      "get": {
+        "operationId": "ListConversations",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/apiListConversationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "user",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Conversation"
+        ]
+      }
+    },
     "/conversation/api/v1/message/add": {
       "post": {
         "operationId": "AddMessage",
@@ -65,6 +95,38 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/apiAddMessageRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Conversation"
+        ]
+      }
+    },
+    "/conversation/api/v1/message/read": {
+      "post": {
+        "operationId": "ReadMessages",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/apiReadMessagesRequest"
             }
           }
         ],
@@ -133,6 +195,20 @@
         "messageID"
       ]
     },
+    "apiListConversationsResponse": {
+      "type": "object",
+      "properties": {
+        "conversations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/apiUserConversation"
+          }
+        }
+      },
+      "required": [
+        "conversations"
+      ]
+    },
     "apiListMessagesResponse": {
       "type": "object",
       "properties": {
@@ -161,13 +237,35 @@
         },
         "text": {
           "type": "string"
+        },
+        "unread": {
+          "type": "boolean"
         }
       },
       "required": [
         "id",
         "conversationID",
         "userID",
-        "text"
+        "text",
+        "unread"
+      ]
+    },
+    "apiReadMessagesRequest": {
+      "type": "object",
+      "properties": {
+        "conversationID": {
+          "type": "string"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "conversationID",
+        "messages"
       ]
     },
     "apiStartConversationRequest": {
@@ -194,6 +292,21 @@
       },
       "required": [
         "conversationID"
+      ]
+    },
+    "apiUserConversation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "userID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "userID"
       ]
     },
     "protobufAny": {

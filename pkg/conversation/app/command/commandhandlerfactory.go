@@ -20,6 +20,8 @@ func (f commandHandlerFactory) CreateHandler(unitOfWork commonapp.UnitOfWork, co
 		return NewStartConversationCommandHandler(unitOfWork.(app.UnitOfWork)), nil
 	case AddMessageCommand:
 		return NewAddMessageCommandHandler(unitOfWork.(app.UnitOfWork)), nil
+	case ReadMessagesCommand:
+		return NewReadMessagesCommandHandler(unitOfWork.(app.UnitOfWork)), nil
 	default:
 		return nil, nil
 	}
@@ -73,6 +75,36 @@ func (h addMessageCommandHandler) Handle(currentCommand commonapp.Command) (inte
 		}
 		return service.AddMessage(conversationID, userID, command1.Text)
 	}, "")
+}
+
+type readMessagesCommandHandler struct {
+	unitOfWork app.UnitOfWork
+}
+
+func NewReadMessagesCommandHandler(unitOfWork app.UnitOfWork) commonapp.CommandHandler {
+	return &readMessagesCommandHandler{
+		unitOfWork: unitOfWork,
+	}
+}
+
+func (h readMessagesCommandHandler) Handle(currentCommand commonapp.Command) (interface{}, error) {
+	command1 := currentCommand.(ReadMessages)
+	return executeUnitOfWork(h.unitOfWork, func(service app.ConversationService) (interface{}, error) {
+		conversationID, err := uuid.FromString(command1.ConversationID)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		userID, err := uuid.FromString(command1.UserID)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		messages, err := uuid.FromStrings(command1.Messages)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		err = service.ReadMessages(conversationID, userID, messages)
+		return nil, err
+	}, command1.UserID)
 }
 
 func executeUnitOfWork(unitOfWork app.UnitOfWork, f func(service app.ConversationService) (interface{}, error), lockName string) (interface{}, error) {

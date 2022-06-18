@@ -1,0 +1,1 @@
+DROP TABLE user_unread_message;

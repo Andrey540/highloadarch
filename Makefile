@@ -5,6 +5,7 @@
 APP_CMD_NAMES = \
 	socialnetwork \
 	conversation \
+	counter \
 	post \
 	user
 
@@ -12,6 +13,7 @@ APP_CMD_NAMES = \
 #  used to generate client/server Go code and REST API proxy (both Go code and Swagger docs)
 APP_PROTO_FILES = \
 	pkg/common/api/conversation.proto \
+	pkg/common/api/counter.proto \
 	pkg/common/api/post.proto \
 	pkg/common/api/user.proto \
 

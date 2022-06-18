@@ -46,11 +46,21 @@ type ListUserItem struct {
 	Username string
 }
 
+type UserConversationItem struct {
+	UserID         string
+	Username       string
+	UnreadMessages int
+}
+
 type UserProfilePage struct { // nolint: maligned
 	IsSelfProfile bool
 	Profile       UserData
 	Friends       []FriendData
 	IsFriend      bool
+}
+
+type UserConversationsPage struct { // nolint: maligned
+	Conversations []UserConversationItem
 }
 
 type FriendData struct {
@@ -154,6 +164,13 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	// noinspection GoUnhandledErrorResult
 	defer conversationGRPCConn.Close()
 
+	counterGRPCConn, err := grpc.DialContext(ctx, cnf.CounterServiceGRPCAddress, grpc.WithInsecure())
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	// noinspection GoUnhandledErrorResult
+	defer counterGRPCConn.Close()
+
 	postGRPCConn, err := grpc.DialContext(ctx, cnf.PostServiceGRPCAddress, grpc.WithInsecure())
 	if err != nil {
 		return errors.WithStack(err)
@@ -163,6 +180,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 
 	userService := inrastructure.NewUserService(userGRPCConn)
 	conversationService := inrastructure.NewConversationService(conversationGRPCConn)
+	counterService := inrastructure.NewCounterService(counterGRPCConn)
 	postService := inrastructure.NewPostService(postGRPCConn)
 	realtimeHosts, err := cnf.realtimeHosts()
 	if err != nil {
@@ -183,12 +201,13 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	stopChan := make(chan struct{})
 	server.ListenOSKillSignals(stopChan)
 	serverHub := server.NewHub(stopChan)
-	serveHTTP(cnf, serverHub, userService, conversationService, postService, sessionService, realtimeClientService, logger, errorLogger, metricsHandler)
+	serveHTTP(cnf, serverHub, userService, conversationService, counterService, postService, sessionService, realtimeClientService, logger, errorLogger, metricsHandler)
 
 	return serverHub.Wait()
 }
 
-func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.UserService, conversationService inrastructure.ConversationService, postService inrastructure.PostService,
+func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.UserService,
+	conversationService inrastructure.ConversationService, counterService inrastructure.CounterService, postService inrastructure.PostService,
 	sessionService redis.SessionService, realtimeClientService realtime.ClientService, logger, errorLogger *stdlog.Logger, metricsHandler metrics.PrometheusMetricsHandler) {
 	ctx := context.Background()
 	_, cancel := context.WithCancel(ctx)
@@ -207,6 +226,7 @@ func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.
 		signInTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/login.page.html")...))
 		listUsersTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/user_list.page.html")...))
 		conversationTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/conversation.page.html")...))
+		conversationsTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/user_conversations.page.html")...))
 		myPostsTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/my_posts.page.html")...))
 		newPostsTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/new_posts.page.html")...))
 		postTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/post.page.html")...))
@@ -222,6 +242,7 @@ func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.
 		router.HandleFunc("/app/logout", logoutUserWithRedirect(sessionService)).Methods(http.MethodGet)
 		router.HandleFunc("/app/user/list", listUsers(userService, listUsersTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/conversation/user/{id}", getConversation(userService, conversationService, conversationTpl)).Methods(http.MethodGet)
+		router.HandleFunc("/app/conversation/list", listConversations(userService, conversationService, counterService, conversationsTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/post/list", getMyPosts(postService, myPostsTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/post/news", getNewPosts(postService, userService, realtimeClientService, newPostsTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/post/{id}", getPost(postService, userService, postTpl)).Methods(http.MethodGet)
@@ -229,6 +250,7 @@ func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.
 		router.PathPrefix("/user/api/").HandlerFunc(proxyRequest(config.UserServiceRESTAddress))
 		router.PathPrefix("/conversation/api/").HandlerFunc(proxyRequest(config.ConversationServiceRESTAddress))
 		router.PathPrefix("/post/api/").HandlerFunc(proxyRequest(config.PostServiceRESTAddress))
+		router.PathPrefix("/counter/api/").HandlerFunc(proxyRequest(config.CounterServiceRESTAddress))
 
 		nextRequestID := func() string {
 			return satoriuuid.NewV1().String()
@@ -461,8 +483,10 @@ func getConversation(userService inrastructure.UserService, conversationService 
 			return
 		}
 		var userIDs []string
+		var messageIDs []string
 		for _, message := range messages {
 			userIDs = append(userIDs, message.UserID)
+			messageIDs = append(messageIDs, message.Id)
 		}
 		loggedUserID := inrastructure.GetUserIDFromContext(r)
 		userIDs = append(userIDs, loggedUserID)
@@ -478,7 +502,49 @@ func getConversation(userService inrastructure.UserService, conversationService 
 			response.WriteErrorResponse(err, w)
 			return
 		}
+		err = conversationService.ReadMessages(r, conversationID, messageIDs)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
 		page := ConversationPage{ID: conversationID, UserName: loggedUser.UserName, Messages: messagesData}
+		err = tpl.Execute(w, page)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+	}
+}
+
+func listConversations(userService inrastructure.UserService, conversationService inrastructure.ConversationService,
+	counterService inrastructure.CounterService, tpl *template.Template) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		conversations, err := conversationService.ListConversations(r)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		unreadMessagesMap, err := getUnreadMessagesMap(r, counterService)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		var userIDs []string
+		for _, conversation := range conversations {
+			userIDs = append(userIDs, conversation.UserID)
+		}
+		usersMap, err := getUsersMap(r, userService, userIDs)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		conversationsData, err := getConversations(usersMap, unreadMessagesMap, conversations)
+		if err != nil {
+			response.WriteErrorResponse(err, w)
+			return
+		}
+		page := UserConversationsPage{Conversations: conversationsData}
 		err = tpl.Execute(w, page)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
@@ -628,6 +694,18 @@ func getFriends(friends []*api.Friend) []FriendData {
 	return result
 }
 
+func getUnreadMessagesMap(r *http.Request, counterService inrastructure.CounterService) (map[string]int, error) {
+	result := make(map[string]int)
+	unreadMessages, err := counterService.ListUnreadMessages(r)
+	if err != nil {
+		return nil, err
+	}
+	for _, messages := range unreadMessages {
+		result[messages.ConversationID] = int(messages.Count)
+	}
+	return result, nil
+}
+
 func getUsersMap(r *http.Request, userService inrastructure.UserService, ids []string) (map[string]*api.UserListItem, error) {
 	result := make(map[string]*api.UserListItem)
 	users, err := userService.ListUsers(r, ids)
@@ -636,6 +714,20 @@ func getUsersMap(r *http.Request, userService inrastructure.UserService, ids []s
 	}
 	for _, user := range users {
 		result[user.UserID] = user
+	}
+	return result, nil
+}
+
+func getConversations(usersMap map[string]*api.UserListItem, unreadMessagesMap map[string]int, conversations []*api.UserConversation) ([]UserConversationItem, error) {
+	var result []UserConversationItem
+	for _, conversation := range conversations {
+		if user, found := usersMap[conversation.UserID]; found {
+			unreadMessagesCount := 0
+			if count, found1 := unreadMessagesMap[conversation.Id]; found1 {
+				unreadMessagesCount = count
+			}
+			result = append(result, UserConversationItem{UserID: conversation.UserID, Username: user.UserName, UnreadMessages: unreadMessagesCount})
+		}
 	}
 	return result, nil
 }

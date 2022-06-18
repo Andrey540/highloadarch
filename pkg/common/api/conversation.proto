@@ -9,12 +9,19 @@ option php_metadata_namespace = "Api\\Grpc\\Conversation";
 // See https://grpc-ecosystem.github.io/grpc-gateway/
 import "google/api/annotations.proto";
 import "protoc-gen-swagger/options/annotations.proto";
+import "google/protobuf/empty.proto";
 
 service Conversation {
   rpc StartConversation (StartConversationRequest) returns (StartConversationResponse) {
     option (google.api.http) = {
       post: "/conversation/api/v1/start"
       body: "*"
+    };
+  }
+
+  rpc ListConversations (ListConversationsRequest) returns (ListConversationsResponse) {
+    option (google.api.http) = {
+      get: "/conversation/api/v1/list"
     };
   }
 
@@ -30,6 +37,31 @@ service Conversation {
       get: "/conversation/api/v1/conversation"
     };
   }
+
+  rpc ReadMessages (ReadMessagesRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/conversation/api/v1/message/read"
+      body: "*"
+    };
+  }
+}
+
+message ListConversationsRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["user"]
+    }
+  };
+  string user = 1;
+}
+
+message ListConversationsResponse {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["conversations"]
+    }
+  };
+  repeated UserConversation conversations = 1;
 }
 
 message StartConversationRequest {
@@ -70,8 +102,18 @@ message AddMessageResponse {
   string messageID = 1;
 }
 
+message ReadMessagesRequest {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["conversationID", "messages"]
+    }
+  };
+  string conversationID = 1;
+  repeated string messages = 2;
+}
+
 message ListMessagesRequest {
-  string conversationID = 1 [(grpc.gateway.protoc_gen_swagger.options.openapiv2_field) = { required: ["conversationID"]; }];
+  string conversationID = 1 [(grpc.gateway.protoc_gen_swagger.options.openapiv2_field) = {required: ["conversationID"];}];
 }
 
 message ListMessagesResponse {
@@ -83,14 +125,25 @@ message ListMessagesResponse {
   repeated Message messages = 1;
 }
 
+message UserConversation {
+  option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
+    json_schema: {
+      required: ["id", "userID"]
+    }
+  };
+  string id = 1;
+  string userID = 2;
+}
+
 message Message {
   option (grpc.gateway.protoc_gen_swagger.options.openapiv2_schema) = {
     json_schema: {
-      required: ["id", "conversationID", "userID", "text"]
+      required: ["id", "conversationID", "userID", "text", "unread"]
     }
   };
   string id = 1;
   string conversationID = 2;
   string userID = 3;
   string text = 4;
+  bool unread = 5;
 }

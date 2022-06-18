@@ -9,12 +9,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-func NewUnitOfWorkFactory(client sql.TransactionalClient) commonapp.UnitOfWorkFactory {
-	return &unitOfWorkFactory{client: client}
+func NewUnitOfWorkFactory(client sql.TransactionalClient, dbName string) commonapp.UnitOfWorkFactory {
+	return &unitOfWorkFactory{client: client, dbName: dbName}
 }
 
 type unitOfWorkFactory struct {
 	client sql.TransactionalClient
+	dbName string
 }
 
 func (s *unitOfWorkFactory) NewUnitOfWork(lockNames []string) (commonapp.UnitOfWork, error) {
@@ -22,12 +23,13 @@ func (s *unitOfWorkFactory) NewUnitOfWork(lockNames []string) (commonapp.UnitOfW
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return &unitOfWork{transaction: transaction, locks: locks}, nil
+	return &unitOfWork{transaction: transaction, locks: locks, dbName: s.dbName}, nil
 }
 
 type unitOfWork struct {
 	transaction sql.Transaction
 	locks       []sql.Lock
+	dbName      string
 }
 
 func (u *unitOfWork) ConversationRepository() app.ConversationRepository {
@@ -38,16 +40,20 @@ func (u *unitOfWork) MessageRepository() app.MessageRepository {
 	return NewMessageRepository(u.transaction)
 }
 
+func (u *unitOfWork) UnreadMessagesRepository() app.UnreadMessagesRepository {
+	return NewUnreadMessageRepository(u.transaction, u.dbName)
+}
+
 func (u *unitOfWork) EventStore() commonapp.EventStore {
-	return event.NewEventStore(u.transaction)
+	return event.NewEventStore(u.transaction, u.dbName)
 }
 
 func (u *unitOfWork) ProcessedEventStore() commonapp.ProcessedEventStore {
-	return event.NewProcessedEventStore(u.transaction)
+	return event.NewProcessedEventStore(u.transaction, u.dbName)
 }
 
 func (u *unitOfWork) ProcessedCommandStore() commonapp.ProcessedCommandStore {
-	return command.NewProcessedCommandStore(u.transaction)
+	return command.NewProcessedCommandStore(u.transaction, u.dbName)
 }
 
 func (u *unitOfWork) GetLocks(lockNames []string) error {

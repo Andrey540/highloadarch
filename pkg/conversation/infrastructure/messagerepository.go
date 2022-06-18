@@ -18,7 +18,7 @@ func (r messageRepository) NewID() uuid.UUID {
 
 func (r messageRepository) Store(message *app.Message) error {
 	const sqlQuery = `INSERT INTO message (id, conversation_id, user_id, text) VALUES(?, ?, ?, ?)`
-	_, err := r.client.Exec(sqlQuery, sql.BinaryUUID(message.ID), sql.BinaryUUID(message.ConversationID), sql.BinaryUUID(message.UserID), message.Text)
+	_, err := r.client.Exec(sqlQuery, sql.BinaryUUID(message.ID), sql.BinaryUUID(message.ConversationID), sql.BinaryUUID(message.AuthorID), message.Text)
 	return errors.WithStack(err)
 }
 

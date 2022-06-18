@@ -1,0 +1,45 @@
+{
+	"sharded": true,
+	"tables": {
+		"user_unread_message": {
+			"column_vindexes": [
+				{
+					"column": "user_id",
+					"name": "binary_md5_vdx"
+				}
+			]
+		},
+		"stored_event": {
+			"column_vindexes": [
+				{
+					"column": "id",
+					"name": "binary_md5_vdx"
+				}
+			]
+		},
+		"processed_event": {
+			"column_vindexes": [
+				{
+					"column": "id",
+					"name": "binary_md5_vdx"
+				}
+			]
+		},
+		"processed_command": {
+			"column_vindexes": [
+				{
+					"column": "id",
+					"name": "binary_md5_vdx"
+				}
+			]
+		}
+	},
+	"vindexes": {
+		"binary_md5_vdx": {
+			"type": "binary_md5"
+		},
+		"hash": {
+			"type": "hash"
+		}
+	}
+}

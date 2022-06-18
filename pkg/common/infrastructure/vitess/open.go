@@ -37,7 +37,6 @@ func setupDB(db *sql.DB, cfg Config) error {
 		}
 		return errors.Wrapf(err, "failed to ping database")
 	}
-	_, err = db.Exec(`USE ` + cfg.Database)
 	return errors.Wrapf(err, "failed to change database")
 }
 
