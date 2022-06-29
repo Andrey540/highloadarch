@@ -44,6 +44,19 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 		return err
 	}
 
+	restPort := cnf.ServeRESTAddress[1:len(cnf.ServeRESTAddress)]
+	grpcPort := cnf.ServeGRPCAddress[1:len(cnf.ServeGRPCAddress)]
+
+	err = server.ServiceRegistryWithConsul(appID, cnf.ServiceID, restPort, ":"+restPort+"/health", []string{"urlprefix-" + appID + "/"})
+	if err != nil {
+		errorLogger.Println(err)
+		return err
+	}
+	err = server.ServiceRegistryWithConsul(appID, cnf.ServiceID, grpcPort, ":"+restPort+"/health", []string{"urlprefix-/" + " proto=grpc grpcservername=" + cnf.ServiceID})
+	if err != nil {
+		errorLogger.Println(err)
+		return err
+	}
 	connector := vitess.NewConnector()
 	err = connector.Open(cnf.dbDsn(), vitess.Config{MaxConnections: cnf.DBMaxConn, ConnectionLifetime: time.Duration(cnf.DBConnectionLifetime) * time.Second}, "@primary")
 	if err != nil {

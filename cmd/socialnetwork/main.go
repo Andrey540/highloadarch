@@ -247,10 +247,10 @@ func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.
 		router.HandleFunc("/app/post/news", getNewPosts(postService, userService, realtimeClientService, newPostsTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/post/{id}", getPost(postService, userService, postTpl)).Methods(http.MethodGet)
 
-		router.PathPrefix("/user/api/").HandlerFunc(proxyRequest(config.UserServiceRESTAddress))
-		router.PathPrefix("/conversation/api/").HandlerFunc(proxyRequest(config.ConversationServiceRESTAddress))
-		router.PathPrefix("/post/api/").HandlerFunc(proxyRequest(config.PostServiceRESTAddress))
-		router.PathPrefix("/counter/api/").HandlerFunc(proxyRequest(config.CounterServiceRESTAddress))
+		router.PathPrefix("/user/api/").HandlerFunc(proxyRequest("user", config.UserServiceRESTAddress))
+		router.PathPrefix("/conversation/api/").HandlerFunc(proxyRequest("conversation", config.ConversationServiceRESTAddress))
+		router.PathPrefix("/post/api/").HandlerFunc(proxyRequest("post", config.PostServiceRESTAddress))
+		router.PathPrefix("/counter/api/").HandlerFunc(proxyRequest("counter", config.CounterServiceRESTAddress))
 
 		nextRequestID := func() string {
 			return satoriuuid.NewV1().String()
@@ -288,7 +288,7 @@ func getTemplateFiles(filename string) []string {
 	}
 }
 
-func proxyRequest(serviceURL string) http.HandlerFunc {
+func proxyRequest(application, serviceURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		proxyURL, err := url.Parse(serviceURL)
 		if err != nil {
@@ -303,9 +303,10 @@ func proxyRequest(serviceURL string) http.HandlerFunc {
 		if requestID != "" {
 			r.Header.Set(request.RequestIDHeader, requestID)
 		}
+		r.Host = application
 
-		proxy := httputil.NewSingleHostReverseProxy(proxyURL)
-		proxy.ServeHTTP(w, r)
+		proxyServer := httputil.NewSingleHostReverseProxy(proxyURL)
+		proxyServer.ServeHTTP(w, r)
 	}
 }
 

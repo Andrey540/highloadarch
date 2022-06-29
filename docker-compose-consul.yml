@@ -1,0 +1,56 @@
+version: '3.5'
+
+services:
+  conversation-2:
+    image: "andrey540/conversation:v11"
+    container_name: conversation-2
+    environment:
+      SERVICE_ID: conversation-2
+      SCHEMA_HOST: vtctld
+      SCHEMA_PORT: 15999
+      DB_HOST: vtgate
+      DB_PORT: 15999
+      DB_NAME: conversation_keyspace
+      DB_USER: socialnetwork
+      DB_PASSWORD: passwd
+      DB_MAX_CONN: 50
+      AMQP_HOST: rabbitmq
+      AMQP_USER: guest
+      AMQP_PASSWORD: guest
+      AMQP_ENABLED: 1
+      SERVE_REST_ADDRESS: :80
+      SERVE_GRPC_ADDRESS: :81
+      CONSUL_HTTP_ADDR: consul1:8500
+    healthcheck:
+      interval: 30s
+      retries: 15
+      test:
+        - CMD-SHELL
+        - wget -nv -t1 --spider localhost:80/health
+
+  conversation-3:
+    image: "andrey540/conversation:v11"
+    container_name: conversation-3
+    environment:
+      SERVICE_ID: conversation-3
+      SCHEMA_HOST: vtctld
+      SCHEMA_PORT: 15999
+      DB_HOST: vtgate
+      DB_PORT: 15999
+      DB_NAME: conversation_keyspace
+      DB_USER: socialnetwork
+      DB_PASSWORD: passwd
+      DB_MAX_CONN: 50
+      AMQP_HOST: rabbitmq
+      AMQP_USER: guest
+      AMQP_PASSWORD: guest
+      AMQP_ENABLED: 1
+      SERVE_REST_ADDRESS: :80
+      SERVE_GRPC_ADDRESS: :81
+      CONSUL_HTTP_ADDR: consul1:8500
+    healthcheck:
+      interval: 30s
+      retries: 15
+      test:
+        - CMD-SHELL
+        - wget -nv -t1 --spider localhost:80/health

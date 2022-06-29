@@ -159,15 +159,15 @@ services:
       - "${PWD}/centrifugo:/centrifugo"
 
   socialnetwork-1:
-    image: "andrey540/socialnetwork:v10"
+    image: "andrey540/socialnetwork:v11"
     container_name: socialnetwork-1
     environment:
       REDIS_HOST: redis
       SERVE_REST_ADDRESS: :80
       USER_SERVICE_REST_ADDRESS: http://user:80
       USER_SERVICE_GRPC_ADDRESS: user:81
-      CONVERSATION_SERVICE_REST_ADDRESS: http://conversation:80
-      CONVERSATION_SERVICE_GRPC_ADDRESS: conversation:81
+      CONVERSATION_SERVICE_REST_ADDRESS: http://fabio:9999
+      CONVERSATION_SERVICE_GRPC_ADDRESS: fabio-grpc:9999
       COUNTER_SERVICE_REST_ADDRESS: http://counter:80
       COUNTER_SERVICE_GRPC_ADDRESS: counter:81
       POST_SERVICE_REST_ADDRESS: http://post:80
@@ -178,20 +178,20 @@ services:
       ]'
     depends_on:
       - user
-      - conversation
+      - conversation-1
       - post
       - redis
 
   socialnetwork-2:
-    image: "andrey540/socialnetwork:v10"
+    image: "andrey540/socialnetwork:v11"
     container_name: socialnetwork-2
     environment:
       REDIS_HOST: redis
       SERVE_REST_ADDRESS: :80
       USER_SERVICE_REST_ADDRESS: http://user:80
       USER_SERVICE_GRPC_ADDRESS: user:81
-      CONVERSATION_SERVICE_REST_ADDRESS: http://conversation:80
-      CONVERSATION_SERVICE_GRPC_ADDRESS: conversation:81
+      CONVERSATION_SERVICE_REST_ADDRESS: http://fabio:9999
+      CONVERSATION_SERVICE_GRPC_ADDRESS: fabio-grpc:9999
       COUNTER_SERVICE_REST_ADDRESS: http://counter:80
       COUNTER_SERVICE_GRPC_ADDRESS: counter:81
       POST_SERVICE_REST_ADDRESS: http://post:80
@@ -202,12 +202,12 @@ services:
       ]'
     depends_on:
       - user
-      - conversation
+      - conversation-1
       - post
       - redis
 
   user:
-    image: "andrey540/user:v10"
+    image: "andrey540/user:v11"
     container_name: user
     environment:
       DB_MASTER_HOST: mysql-node-1
@@ -226,10 +226,11 @@ services:
       - mysql-node-1
       - haproxy
 
-  conversation:
-    image: "andrey540/conversation:v10"
-    container_name: conversation
+  conversation-1:
+    image: "andrey540/conversation:v11"
+    container_name: conversation-1
     environment:
+      SERVICE_ID: conversation-1
       SCHEMA_HOST: vtctld
       SCHEMA_PORT: 15999
       DB_HOST: vtgate
@@ -244,6 +245,7 @@ services:
       AMQP_ENABLED: 1
       SERVE_REST_ADDRESS: :80
       SERVE_GRPC_ADDRESS: :81
+      CONSUL_HTTP_ADDR: consul1:8500
     healthcheck:
       interval: 30s
       retries: 15
@@ -253,9 +255,12 @@ services:
     depends_on:
       - vtgate
       - vtctld
+      - consul1
+      - fabio
+      - fabio-grpc
 
   counter:
-    image: "andrey540/counter:v10"
+    image: "andrey540/counter:v11"
     container_name: counter
     environment:
       SCHEMA_HOST: vtctld
@@ -283,7 +288,7 @@ services:
       - vtctld
 
   post:
-    image: "andrey540/post:v10"
+    image: "andrey540/post:v11"
     container_name: post
     environment:
       TARANTOOL_HOST: tarantool
@@ -311,7 +316,7 @@ services:
       - mysql-post
 
   post-worker-1:
-    image: "andrey540/post:v10"
+    image: "andrey540/post:v11"
     container_name: post-worker-1
     environment:
       TARANTOOL_HOST: tarantool
@@ -345,7 +350,7 @@ services:
       - realtime-2
 
   post-worker-2:
-    image: "andrey540/post:v10"
+    image: "andrey540/post:v11"
     container_name: post-worker-2
     environment:
       TARANTOOL_HOST: tarantool
@@ -378,6 +383,28 @@ services:
       - realtime-1
       - realtime-2
 
+  fabio:
+    image: fabiolb/fabio:latest
+    environment:
+      - registry_consul_addr=consul1:8500 # environment variable for consul service address
+      - proxy_strategy=rr # environment variable for load balancing strategy. rr is round-robin
+    ports:
+      - "9998:9998"
+    depends_on:
+      - consul1
+
+  fabio-grpc:
+    image: fabiolb/fabio:latest
+    environment:
+      - registry_consul_addr=consul1:8500 # environment variable for consul service address
+      - proxy_strategy=rr # environment variable for load balancing strategy. rr is round-robin
+    ports:
+      - "9918:9998"
+    volumes:
+      - "${PWD}/consul/fabio.properties:/etc/fabio/fabio.properties"
+    depends_on:
+      - consul1
+
   consul1:
     command: agent -server -bootstrap-expect 3 -ui -disable-host-node-id -client 0.0.0.0
     hostname: consul1
@@ -389,25 +416,25 @@ services:
 
   consul2:
     command: agent -server -retry-join consul1 -disable-host-node-id
-    depends_on:
-      - consul1
+    hostname: consul2
+    image: consul:latest
     expose:
       - "8400"
       - "8500"
       - "8600"
-    hostname: consul2
-    image: consul:latest
+    depends_on:
+      - consul1
 
   consul3:
     command: agent -server -retry-join consul1 -disable-host-node-id
-    depends_on:
-      - consul1
+    hostname: consul3
+    image: consul:latest
     expose:
       - "8400"
       - "8500"
       - "8600"
-    hostname: consul3
-    image: consul:latest
+    depends_on:
+      - consul1
 
   schemaload_conversation_keyspace:
     command:

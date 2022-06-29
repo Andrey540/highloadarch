@@ -9,6 +9,7 @@ import (
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
 	"github.com/gorilla/mux"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	satoriuuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -18,12 +19,14 @@ import (
 	"google.golang.org/grpc/status"
 
 	"context"
+	"fmt"
 	"io"
 	stdlog "log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -176,6 +179,45 @@ func InitLogger() *stdlog.Logger {
 
 func InitErrorLogger() *stdlog.Logger {
 	return stdlog.New(os.Stderr, "http: ", stdlog.LstdFlags)
+}
+
+func ServiceRegistryWithConsul(serviceName, serviceID, port, checkPath string, tags []string) error {
+	config := consulapi.DefaultConfig()
+	consul, err := consulapi.NewClient(config)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	address, err := GetHostname()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	portNumber, err := strconv.Atoi(port)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	serviceUID := fmt.Sprintf("%s:%v", serviceID, port)
+
+	registration := &consulapi.AgentServiceRegistration{
+		ID:      serviceUID,
+		Name:    serviceName,
+		Port:    portNumber,
+		Address: address,
+		Tags:    tags, /* Add Tags for registration */
+		Check: &consulapi.AgentServiceCheck{
+			HTTP:     "http://" + serviceID + checkPath,
+			Interval: "10s",
+			Timeout:  "30s",
+		},
+	}
+
+	err = consul.Agent().ServiceRegister(registration)
+	return errors.WithStack(err)
+}
+
+func GetHostname() (string, error) {
+	return os.Hostname()
 }
 
 func InitEventTransport(kafkaCnf *kafka.Config, amqpCnf *amqp.Config, logger, errorLogger *stdlog.Logger) ([]app.Transport, []event.Connection, error) {
