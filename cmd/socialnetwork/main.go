@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"html/template"
+	"io"
 	stdlog "log"
 	"net/http"
 	"net/http/httputil"
@@ -135,7 +136,7 @@ func main() {
 }
 
 func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
-	metricsHandler, err := metrics.NewPrometheusMetricsHandler(appID)
+	metricsHandler, err := metrics.NewPrometheusMetricsHandler()
 	if err != nil {
 		return err
 	}
@@ -150,38 +151,17 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	userGRPCConn, err := grpc.DialContext(ctx, cnf.UserServiceGRPCAddress, grpc.WithInsecure())
+	grpcConn, err := grpc.DialContext(ctx, cnf.ServiceGRPCAddress, grpc.WithInsecure())
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	// noinspection GoUnhandledErrorResult
-	defer userGRPCConn.Close()
+	defer grpcConn.Close()
 
-	conversationGRPCConn, err := grpc.DialContext(ctx, cnf.ConversationServiceGRPCAddress, grpc.WithInsecure())
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	// noinspection GoUnhandledErrorResult
-	defer conversationGRPCConn.Close()
-
-	counterGRPCConn, err := grpc.DialContext(ctx, cnf.CounterServiceGRPCAddress, grpc.WithInsecure())
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	// noinspection GoUnhandledErrorResult
-	defer counterGRPCConn.Close()
-
-	postGRPCConn, err := grpc.DialContext(ctx, cnf.PostServiceGRPCAddress, grpc.WithInsecure())
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	// noinspection GoUnhandledErrorResult
-	defer postGRPCConn.Close()
-
-	userService := inrastructure.NewUserService(userGRPCConn)
-	conversationService := inrastructure.NewConversationService(conversationGRPCConn)
-	counterService := inrastructure.NewCounterService(counterGRPCConn)
-	postService := inrastructure.NewPostService(postGRPCConn)
+	userService := inrastructure.NewUserService(grpcConn)
+	conversationService := inrastructure.NewConversationService(grpcConn)
+	counterService := inrastructure.NewCounterService(grpcConn)
+	postService := inrastructure.NewPostService(grpcConn)
 	realtimeHosts, err := cnf.realtimeHosts()
 	if err != nil {
 		return err
@@ -214,12 +194,8 @@ func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.
 	var httpServer *http.Server
 	serverHub.Serve(func() error {
 		router := mux.NewRouter()
-		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-			response.WriteSuccessResponse(w)
-		}).Methods(http.MethodGet)
-		router.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
-			response.WriteSuccessResponse(w)
-		}).Methods(http.MethodGet)
+		router.HandleFunc("/", checkHealth(sessionService)).Methods(http.MethodGet)
+		router.HandleFunc("/health", checkHealth(sessionService)).Methods(http.MethodGet)
 
 		registerUserTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/register.page.html")...))
 		viewUserTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/user_profile.page.html")...))
@@ -247,10 +223,10 @@ func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.
 		router.HandleFunc("/app/post/news", getNewPosts(postService, userService, realtimeClientService, newPostsTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/post/{id}", getPost(postService, userService, postTpl)).Methods(http.MethodGet)
 
-		router.PathPrefix("/user/api/").HandlerFunc(proxyRequest("user", config.UserServiceRESTAddress))
-		router.PathPrefix("/conversation/api/").HandlerFunc(proxyRequest("conversation", config.ConversationServiceRESTAddress))
-		router.PathPrefix("/post/api/").HandlerFunc(proxyRequest("post", config.PostServiceRESTAddress))
-		router.PathPrefix("/counter/api/").HandlerFunc(proxyRequest("counter", config.CounterServiceRESTAddress))
+		router.PathPrefix("/user/api/").HandlerFunc(proxyRequest("user", config.ServiceRESTAddress))
+		router.PathPrefix("/conversation/api/").HandlerFunc(proxyRequest("conversation", config.ServiceRESTAddress))
+		router.PathPrefix("/post/api/").HandlerFunc(proxyRequest("post", config.ServiceRESTAddress))
+		router.PathPrefix("/counter/api/").HandlerFunc(proxyRequest("counter", config.ServiceRESTAddress))
 
 		nextRequestID := func() string {
 			return satoriuuid.NewV1().String()
@@ -759,4 +735,17 @@ func getNews(usersMap map[string]*api.UserListItem, posts []*api.NewsItem) ([]Ne
 		}
 	}
 	return result, nil
+}
+
+func checkHealth(sessionService redis.SessionService) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		err := sessionService.Ping()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = io.WriteString(w, http.StatusText(http.StatusInternalServerError))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, http.StatusText(http.StatusOK))
+	}
 }

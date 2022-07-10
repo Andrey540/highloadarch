@@ -142,7 +142,7 @@ func (s service) ReadMessages(conversationID, userID uuid.UUID, messageIDs []uui
 		return nil
 	}
 	messages, err := s.unreadMessagesRepository.FindUserUnreadMessages(conversationID, userID, messageIDs)
-	if err != nil {
+	if err != nil || len(messages.MessageIDs) == 0 {
 		return errors.WithStack(err)
 	}
 	err = s.unreadMessagesRepository.Remove(messages)

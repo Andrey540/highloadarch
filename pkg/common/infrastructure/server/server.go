@@ -7,6 +7,7 @@ import (
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/kafka"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/metrics"
 	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
+	"github.com/callicoder/go-docker/pkg/common/infrastructure/sql"
 	"github.com/gorilla/mux"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	consulapi "github.com/hashicorp/consul/api"
@@ -90,6 +91,7 @@ func ListenOSKillSignals(stopChan chan<- struct{}) {
 
 func ServeHTTP(
 	serveGRPCAddress, serveRESTAddress, appID string,
+	healthCheckClient sql.HealthCheckClient,
 	serverHub *Hub,
 	metricsHandler metrics.PrometheusMetricsHandler,
 	registerFunc func(context.Context, *runtime.ServeMux, string, []grpc.DialOption) error,
@@ -116,18 +118,9 @@ func ServeHTTP(
 		router.PathPrefix("/" + appID + "/api/").Handler(http.TimeoutHandler(grpcGatewayMux, 15*time.Second, ""))
 
 		// Implement healthcheck for Kubernetes
-		router.HandleFunc("/resilience/ready", func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, http.StatusText(http.StatusOK))
-		}).Methods(http.MethodGet)
-		router.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, http.StatusText(http.StatusOK))
-		}).Methods(http.MethodGet)
-		router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, http.StatusText(http.StatusOK))
-		}).Methods(http.MethodGet)
+		router.HandleFunc("/resilience/ready", checkHealth(healthCheckClient)).Methods(http.MethodGet)
+		router.HandleFunc("/health", checkHealth(healthCheckClient)).Methods(http.MethodGet)
+		router.HandleFunc("/", checkHealth(healthCheckClient)).Methods(http.MethodGet)
 
 		nextRequestID := func() string {
 			return satoriuuid.NewV1().String()
@@ -165,10 +158,11 @@ func ServeGRPC(serveGRPCAddress string, serverHub *Hub, baseServer *grpc.Server)
 	})
 }
 
-func MakeGrpcUnaryInterceptor(logger, errorLogger *stdlog.Logger) grpc.UnaryServerInterceptor {
+func MakeGrpcUnaryInterceptor(metricsHandler metrics.PrometheusMetricsHandler, logger, errorLogger *stdlog.Logger) grpc.UnaryServerInterceptor {
 	loggerInterceptor := makeLoggerServerInterceptor(logger, errorLogger)
+	metricsInterceptor := metricsHandler.AddGRPCMetricsMiddleware(loggerInterceptor)
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-		resp, err = loggerInterceptor(ctx, req, info, handler)
+		resp, err = metricsInterceptor(ctx, req, info, handler)
 		return resp, translateGRPCError(err)
 	}
 }
@@ -308,6 +302,19 @@ func makeLoggerServerInterceptor(logger, errorLogger *stdlog.Logger) grpc.UnaryS
 			logger.Println(fields, "call finished")
 		}
 		return resp, err
+	}
+}
+
+func checkHealth(healthCheckClient sql.HealthCheckClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		err := healthCheckClient.Ping()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = io.WriteString(w, http.StatusText(http.StatusInternalServerError))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, http.StatusText(http.StatusOK))
 	}
 }
 

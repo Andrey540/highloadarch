@@ -24,15 +24,9 @@ type config struct {
 
 	MigrationsDir string `envconfig:"migrations_dir"`
 
-	ServeRESTAddress               string `envconfig:"serve_rest_address" default:":80"`
-	UserServiceRESTAddress         string `envconfig:"user_service_rest_address" default:"http://user:80"`
-	UserServiceGRPCAddress         string `envconfig:"user_service_grpc_address" default:"user:81"`
-	ConversationServiceRESTAddress string `envconfig:"conversation_service_rest_address" default:"http://conversation:80"`
-	ConversationServiceGRPCAddress string `envconfig:"conversation_service_grpc_address" default:"conversation:81"`
-	CounterServiceRESTAddress      string `envconfig:"counter_service_rest_address" default:"http://counter:80"`
-	CounterServiceGRPCAddress      string `envconfig:"counter_service_grpc_address" default:"counter:81"`
-	PostServiceRESTAddress         string `envconfig:"post_service_rest_address" default:"http://post:80"`
-	PostServiceGRPCAddress         string `envconfig:"post_service_grpc_address" default:"post:81"`
+	ServeRESTAddress   string `envconfig:"serve_rest_address" default:":80"`
+	ServiceRESTAddress string `envconfig:"service_rest_address" default:"http://service:80"`
+	ServiceGRPCAddress string `envconfig:"service_grpc_address" default:"service:81"`
 }
 
 func (c *config) realtimeHosts() ([]string, error) {

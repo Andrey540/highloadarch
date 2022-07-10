@@ -38,6 +38,7 @@ type Connector interface {
 	Client() Client
 	TransactionalClient() TransactionalClient
 	Close() error
+	Ping() error
 }
 
 type connector struct {
@@ -88,6 +89,10 @@ func (c *connector) AddSourceDriver(sourceDriver SourceDriver) error {
 func (c *connector) Close() error {
 	err := c.db.Close()
 	return errors.Wrap(err, "failed to disconnect")
+}
+
+func (c *connector) Ping() error {
+	return c.db.Ping()
 }
 
 func (c *connector) Client() Client {

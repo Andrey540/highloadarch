@@ -13,6 +13,10 @@ type Client interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
+type HealthCheckClient interface {
+	Ping() error
+}
+
 type ClientContext interface {
 	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row

@@ -38,7 +38,7 @@ func main() {
 }
 
 func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
-	metricsHandler, err := metrics.NewPrometheusMetricsHandler(appID)
+	metricsHandler, err := metrics.NewPrometheusMetricsHandler()
 	if err != nil {
 		errorLogger.Println(err)
 		return err
@@ -52,7 +52,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 		errorLogger.Println(err)
 		return err
 	}
-	err = server.ServiceRegistryWithConsul(appID, cnf.ServiceID, grpcPort, ":"+restPort+"/health", []string{"urlprefix-/" + " proto=grpc grpcservername=" + cnf.ServiceID})
+	err = server.ServiceRegistryWithConsul(appID+"-grpc", cnf.ServiceID, grpcPort, ":"+restPort+"/health", []string{"urlprefix-/api.Conversation" + " proto=grpc grpcservername=" + cnf.ServiceID})
 	if err != nil {
 		errorLogger.Println(err)
 		return err
@@ -120,7 +120,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 
 	// Serve grpc
 	grpcServer := infrastructure.NewGRPCServer(conversationQueryService, commandsHandler)
-	baseServer := grpc.NewServer(grpc.UnaryInterceptor(server.MakeGrpcUnaryInterceptor(logger, errorLogger)))
+	baseServer := grpc.NewServer(grpc.UnaryInterceptor(server.MakeGrpcUnaryInterceptor(metricsHandler, logger, errorLogger)))
 	api.RegisterConversationServer(baseServer, grpcServer)
 	server.ServeGRPC(cnf.ServeGRPCAddress, serverHub, baseServer)
 
@@ -129,6 +129,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 		cnf.ServeGRPCAddress,
 		cnf.ServeRESTAddress,
 		appID,
+		connector,
 		serverHub,
 		metricsHandler,
 		func(ctx context.Context, grpcGatewayMux *runtime.ServeMux, address string, opts []grpc.DialOption) error {

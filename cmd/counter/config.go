@@ -36,6 +36,8 @@ type config struct {
 
 	ServeRESTAddress string `envconfig:"serve_rest_address" default:":80"`
 	ServeGRPCAddress string `envconfig:"serve_grpc_address" default:":81"`
+
+	ServiceID string `envconfig:"service_id" default:"1"`
 }
 
 func (c *config) dbDsn() vitess.DSN {

@@ -159,57 +159,48 @@ services:
       - "${PWD}/centrifugo:/centrifugo"
 
   socialnetwork-1:
-    image: "andrey540/socialnetwork:v11"
+    image: "andrey540/socialnetwork:v12"
     container_name: socialnetwork-1
     environment:
       REDIS_HOST: redis
       SERVE_REST_ADDRESS: :80
-      USER_SERVICE_REST_ADDRESS: http://user:80
-      USER_SERVICE_GRPC_ADDRESS: user:81
-      CONVERSATION_SERVICE_REST_ADDRESS: http://fabio:9999
-      CONVERSATION_SERVICE_GRPC_ADDRESS: fabio-grpc:9999
-      COUNTER_SERVICE_REST_ADDRESS: http://counter:80
-      COUNTER_SERVICE_GRPC_ADDRESS: counter:81
-      POST_SERVICE_REST_ADDRESS: http://post:80
-      POST_SERVICE_GRPC_ADDRESS: post:81
+      SERVICE_REST_ADDRESS: http://fabio:9999
+      SERVICE_GRPC_ADDRESS: fabio-grpc:9999
       REALTIME_HOSTS: '[
         "ws://127.0.0.1:8886/connection/websocket",
         "ws://127.0.0.1:8887/connection/websocket"
       ]'
     depends_on:
-      - user
+      - user-1
       - conversation-1
-      - post
+      - post-1
+      - counter-1
       - redis
 
   socialnetwork-2:
-    image: "andrey540/socialnetwork:v11"
+    image: "andrey540/socialnetwork:v12"
     container_name: socialnetwork-2
     environment:
       REDIS_HOST: redis
       SERVE_REST_ADDRESS: :80
-      USER_SERVICE_REST_ADDRESS: http://user:80
-      USER_SERVICE_GRPC_ADDRESS: user:81
-      CONVERSATION_SERVICE_REST_ADDRESS: http://fabio:9999
-      CONVERSATION_SERVICE_GRPC_ADDRESS: fabio-grpc:9999
-      COUNTER_SERVICE_REST_ADDRESS: http://counter:80
-      COUNTER_SERVICE_GRPC_ADDRESS: counter:81
-      POST_SERVICE_REST_ADDRESS: http://post:80
-      POST_SERVICE_GRPC_ADDRESS: post:81
+      SERVICE_REST_ADDRESS: http://fabio:9999
+      SERVICE_GRPC_ADDRESS: fabio-grpc:9999
       REALTIME_HOSTS: '[
         "ws://127.0.0.1:8886/connection/websocket",
         "ws://127.0.0.1:8887/connection/websocket"
       ]'
     depends_on:
-      - user
+      - user-1
       - conversation-1
-      - post
+      - post-1
+      - counter-1
       - redis
 
-  user:
-    image: "andrey540/user:v11"
-    container_name: user
+  user-1:
+    image: "andrey540/user:v12"
+    container_name: user-1
     environment:
+      SERVICE_ID: user-1
       DB_MASTER_HOST: mysql-node-1
       DB_SLAVE_HOST: haproxy
       DB_NAME: socialnetwork
@@ -222,12 +213,13 @@ services:
       AMQP_ENABLED: 1
       SERVE_REST_ADDRESS: :80
       SERVE_GRPC_ADDRESS: :81
+      CONSUL_HTTP_ADDR: consul1:8500
     depends_on:
       - mysql-node-1
       - haproxy
 
   conversation-1:
-    image: "andrey540/conversation:v11"
+    image: "andrey540/conversation:v12"
     container_name: conversation-1
     environment:
       SERVICE_ID: conversation-1
@@ -259,10 +251,11 @@ services:
       - fabio
       - fabio-grpc
 
-  counter:
-    image: "andrey540/counter:v11"
-    container_name: counter
+  counter-1:
+    image: "andrey540/counter:v12"
+    container_name: counter-1
     environment:
+      SERVICE_ID: counter-1
       SCHEMA_HOST: vtctld
       SCHEMA_PORT: 15999
       DB_HOST: vtgate
@@ -277,6 +270,7 @@ services:
       AMQP_ENABLED: 1
       SERVE_REST_ADDRESS: :80
       SERVE_GRPC_ADDRESS: :81
+      CONSUL_HTTP_ADDR: consul1:8500
     healthcheck:
       interval: 30s
       retries: 15
@@ -287,10 +281,11 @@ services:
       - vtgate
       - vtctld
 
-  post:
-    image: "andrey540/post:v11"
-    container_name: post
+  post-1:
+    image: "andrey540/post:v12"
+    container_name: post-1
     environment:
+      SERVICE_ID: post-1
       TARANTOOL_HOST: tarantool
       TARANTOOL_PORT: 3301
       DB_HOST: mysql-post
@@ -306,6 +301,7 @@ services:
       WORKERS_COUNT: 2
       SERVE_REST_ADDRESS: :80
       SERVE_GRPC_ADDRESS: :81
+      CONSUL_HTTP_ADDR: consul1:8500
     healthcheck:
       interval: 30s
       retries: 15
@@ -314,9 +310,12 @@ services:
         - wget -nv -t1 --spider localhost:80/health
     depends_on:
       - mysql-post
+      - consul1
+      - fabio
+      - fabio-grpc
 
   post-worker-1:
-    image: "andrey540/post:v11"
+    image: "andrey540/post:v12"
     container_name: post-worker-1
     environment:
       TARANTOOL_HOST: tarantool
@@ -350,7 +349,7 @@ services:
       - realtime-2
 
   post-worker-2:
-    image: "andrey540/post:v11"
+    image: "andrey540/post:v12"
     container_name: post-worker-2
     environment:
       TARANTOOL_HOST: tarantool
@@ -480,21 +479,6 @@ services:
       - VSCHEMA_FILE=counter_keyspace_vschema.json
       - SCHEMA_FILES=counter_keyspace_schema_file.sql
       - POST_LOAD_FILE=
-      - EXTERNAL_DB=0
-    image: vitess/lite:${VITESS_TAG:-latest}
-    volumes:
-      - "${PWD}/vitess:/script"
-
-  vreplication:
-    command:
-      - sh
-      - -c
-      - '[ $$EXTERNAL_DB -eq 1 ] && /script/externaldb_vreplication.sh || exit 0'
-    depends_on:
-      - vtctld
-    environment:
-      - TOPOLOGY_FLAGS=-topo_implementation consul -topo_global_server_address consul1:8500
-        -topo_global_root vitess/global
       - EXTERNAL_DB=0
     image: vitess/lite:${VITESS_TAG:-latest}
     volumes:
@@ -685,9 +669,200 @@ services:
       - "8080"
       - "15999"
 
+  zabbix-server:
+    image: zabbix/zabbix-server-mysql:alpine-5.4-latest
+    ports:
+      - "10051:10051"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./zabbix/env/usr/lib/zabbix/alertscripts:/usr/lib/zabbix/alertscripts:ro
+      - ./zabbix/env/usr/lib/zabbix/externalscripts:/usr/lib/zabbix/externalscripts:ro
+      - ./zabbix/env/var/lib/zabbix/export:/var/lib/zabbix/export:rw
+      - ./zabbix/env/var/lib/zabbix/modules:/var/lib/zabbix/modules:ro
+      - ./zabbix/env/var/lib/zabbix/enc:/var/lib/zabbix/enc:ro
+      - ./zabbix/env/var/lib/zabbix/ssh_keys:/var/lib/zabbix/ssh_keys:ro
+      - ./zabbix/env/var/lib/zabbix/mibs:/var/lib/zabbix/mibs:ro
+      - socialnetwork-snmptraps:/var/lib/zabbix/snmptraps:rw
+    restart: always
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 20000
+        hard: 40000
+    deploy:
+      resources:
+        limits:
+          cpus: '0.70'
+          memory: 1G
+    env_file:
+      - ./zabbix/configs/.env_srv
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: zabbix
+    depends_on:
+      - mysql-server
+    stop_grace_period: 30s
+    sysctls:
+      - net.ipv4.ip_local_port_range=1024 65000
+      - net.ipv4.conf.all.accept_redirects=0
+      - net.ipv4.conf.all.secure_redirects=0
+      - net.ipv4.conf.all.send_redirects=0
+    labels:
+      com.zabbix.description: "Zabbix server with MySQL database support"
+      com.zabbix.company: "Zabbix LLC"
+      com.zabbix.component: "zabbix-server"
+      com.zabbix.dbtype: "mysql"
+      com.zabbix.os: "alpine"
+
+  zabbix-web-nginx-mysql:
+    image: zabbix/zabbix-web-nginx-mysql:alpine-5.4-latest
+    ports:
+      - "8081:8080"
+      - "8443:8443"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./zabbix/env/usr/share/zabbix/modules/:/usr/share/zabbix/modules/:ro
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.70'
+          memory: 512M
+    env_file:
+      - ./zabbix/configs/.env_web
+    environment:
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: zabbix
+    depends_on:
+      - mysql-server
+      - zabbix-server
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 10s
+    sysctls:
+      - net.core.somaxconn=65535
+    labels:
+      com.zabbix.description: "Zabbix frontend on Nginx web-server with MySQL database support"
+      com.zabbix.company: "Zabbix LLC"
+      com.zabbix.component: "zabbix-frontend"
+      com.zabbix.webserver: "nginx"
+      com.zabbix.dbtype: "mysql"
+      com.zabbix.os: "alpine"
+
+  zabbix-agent:
+    image: zabbix/zabbix-agent:alpine-5.4-latest
+    ports:
+      - "10050:10050"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./zabbix/env/etc/zabbix/zabbix_agentd.d:/etc/zabbix/zabbix_agentd.d:ro
+      - ./zabbix/env/var/lib/zabbix/modules:/var/lib/zabbix/modules:ro
+      - ./zabbix/env/var/lib/zabbix/enc:/var/lib/zabbix/enc:ro
+      - ./zabbix/env/var/lib/zabbix/ssh_keys:/var/lib/zabbix/ssh_keys:ro
+    restart: always
+    depends_on:
+      - zabbix-server
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+      mode: global
+    env_file:
+      - ./zabbix/configs/.env_agent
+    privileged: true
+    pid: "host"
+    stop_grace_period: 5s
+    labels:
+      com.zabbix.description: "Zabbix agent"
+      com.zabbix.company: "Zabbix LLC"
+      com.zabbix.component: "zabbix-agentd"
+      com.zabbix.os: "alpine"
+
+  zabbix-snmptraps:
+    image: zabbix/zabbix-snmptraps:alpine-5.4-latest
+    ports:
+      - "162:1162/udp"
+    volumes:
+      - socialnetwork-snmptraps:/var/lib/zabbix/snmptraps
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    stop_grace_period: 5s
+    labels:
+      com.zabbix.description: "Zabbix snmptraps"
+      com.zabbix.company: "Zabbix LLC"
+      com.zabbix.component: "snmptraps"
+      com.zabbix.os: "alpine"
+
+  mysql-server:
+    image: mysql:8.0
+    command:
+      - mysqld
+      - --character-set-server=utf8
+      - --collation-server=utf8_bin
+      - --default-authentication-plugin=mysql_native_password
+    volumes:
+      - socialnetwork-db-zabbix:/var/lib/mysql:rw
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: zabbix
+    stop_grace_period: 1m
+
+  grafana-server:
+    image: grafana/grafana:8.0.4
+    ports:
+      - "3000:3000"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./grafana/configs/.grafana.ini:/etc/grafana/grafana.ini
+      - socialnetwork-grafana-data:/var/lib/grafana:rw
+    restart: always
+    env_file:
+      - ./grafana/configs/.env_grafana
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 20000
+        hard: 40000
+    mem_limit: 512m
+    user: root
+
+  prometheus:
+    container_name: prometheus
+    hostname: prometheus
+    image: prom/prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - socialnetwork-prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - 9090:9090
+    depends_on:
+      - consul1
+
 volumes:
   socialnetwork-db-data-1:
   socialnetwork-db-data-2:
   socialnetwork-db-data-3:
   socialnetwork-db-post-data:
   socialnetwork-db-tarantool:
+  socialnetwork-db-zabbix:
+  socialnetwork-grafana-data:
+  socialnetwork-snmptraps:
+  socialnetwork-prometheus-data:

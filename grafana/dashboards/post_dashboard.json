@@ -1,0 +1,605 @@
+{
+  "dashboard": {
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "editable": true,
+    "gnetId": null,
+    "graphTooltip": 0,
+    "links": [],
+    "panels": [
+      {
+        "datasource": "prometheus",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "id": 6,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "sum by (endpoint) (rate(app_request_count{job=\"post-metrics\"}[1m]))",
+            "interval": "",
+            "legendFormat": "RPS{{endpoint}}",
+            "refId": "A"
+          },
+          {
+            "hide": false,
+            "refId": "B"
+          }
+        ],
+        "title": "RPS App",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "prometheus",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "id": 8,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "sum by (methodName) (rate(app_grpc_request_count{job=\"post-metrics\"}[1m]))",
+            "interval": "",
+            "legendFormat": "{{methodName}}",
+            "refId": "A"
+          },
+          {
+            "exemplar": true,
+            "expr": "",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "",
+            "refId": "B"
+          }
+        ],
+        "title": "GRPC RPS App",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "prometheus",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "id": 4,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(0.5, \n      sum by (le, endpoint) \n         (rate(app_request_latency_seconds_bucket{job=\"post-metrics\"}[1m]))\n) * 1000",
+            "interval": "",
+            "legendFormat": "{{endpoint}} 0.5",
+            "refId": "A"
+          },
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(0.95, \n      sum by (le, endpoint) \n         (rate(app_request_latency_seconds_bucket{job=\"post-metrics\"}[1m]))\n) * 1000",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "{{endpoint}} 0.95",
+            "refId": "B"
+          },
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(0.99, \n      sum by (le, endpoint) \n         (rate(app_request_latency_seconds_bucket{job=\"post-metrics\"}[1m]))\n) * 1000",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "{{endpoint}} 0.99",
+            "refId": "C"
+          },
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(1, \n      sum by (le, endpoint) \n         (rate(app_request_latency_seconds_bucket{job=\"post-metrics\"}[1m]))\n) * 1000",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "{{endpoint}} max",
+            "refId": "D"
+          },
+          {
+            "exemplar": true,
+            "expr": "",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "",
+            "refId": "E"
+          }
+        ],
+        "title": "Latency App",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "prometheus",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "id": 10,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(0.5, \n      sum by (le, methodName) \n         (rate(app_grpc_request_latency_seconds_bucket{job=\"post-metrics\"}[1m]))\n) * 1000",
+            "interval": "",
+            "legendFormat": "{{methodName}} 0.5",
+            "refId": "A"
+          },
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(0.95, \n      sum by (le, methodName) \n         (rate(app_grpc_request_latency_seconds_bucket{job=\"post-metrics\"}[1m]))\n) * 1000",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "{{methodName}} 0.95",
+            "refId": "B"
+          },
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(0.99, \n      sum by (le, methodName) \n         (rate(app_grpc_request_latency_seconds_bucket{job=\"post-metrics\"}[1m]))\n) * 1000",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "{{methodName}} 0.99",
+            "refId": "C"
+          },
+          {
+            "exemplar": true,
+            "expr": "histogram_quantile(1, \n      sum by (le, methodName) \n         (rate(app_grpc_request_latency_seconds_bucket{job=\"post-metrics\"}[1m]))\n) * 1000",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "{{methodName}} max",
+            "refId": "D"
+          },
+          {
+            "hide": false,
+            "refId": "E"
+          }
+        ],
+        "title": "GRPC Latency App",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "prometheus",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        },
+        "id": 2,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "sum by (status, endpoint) (increase(app_server_error_count{job=\"post-metrics\", status=~\"5.+\"}[1m]))",
+            "interval": "",
+            "legendFormat": "{{status}} {{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Error Rate App",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "prometheus",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        },
+        "id": 12,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "sum by (code, methodName) (increase(app_grpc_server_error_count{job=\"post-metrics\", status=~\"5.+\"}[1m]))",
+            "interval": "",
+            "legendFormat": "{{code}} {{methodName}}",
+            "refId": "A"
+          },
+          {
+            "exemplar": true,
+            "expr": "",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "",
+            "refId": "B"
+          }
+        ],
+        "title": "GRPC Error Rate App",
+        "type": "timeseries"
+      }
+    ],
+    "schemaVersion": 30,
+    "style": "dark",
+    "tags": [],
+    "templating": {
+      "list": []
+    },
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "Post",
+    "uid": null,
+    "id": null,
+    "version": 3
+  }
+}

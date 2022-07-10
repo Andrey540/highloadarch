@@ -30,6 +30,7 @@ type SessionService interface {
 	SaveSession(userID string) (string, error)
 	RemoveSession(sessionKey string) error
 	Stop() error
+	Ping() error
 }
 
 type service struct {
@@ -64,6 +65,10 @@ func (s *service) startRedis(cfg *Config) error {
 
 func (s *service) Stop() error {
 	return s.redisClient.Close()
+}
+
+func (s *service) Ping() error {
+	return s.redisClient.Ping().Err()
 }
 
 func (s *service) GetUserSession(sessionKey string) (*UserSession, error) {

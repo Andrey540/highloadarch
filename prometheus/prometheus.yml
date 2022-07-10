@@ -1,0 +1,29 @@
+# global settings
+global:
+  scrape_interval:     15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  - job_name: conversation-metrics
+    consul_sd_configs:
+      - server: 'consul1:8500'
+        services:
+          - 'conversation'
+  - job_name: post-metrics
+    consul_sd_configs:
+      - server: 'consul1:8500'
+        services:
+          - 'post'
+  - job_name: user-metrics
+    consul_sd_configs:
+      - server: 'consul1:8500'
+        services:
+          - 'user'
+  - job_name: counter-metrics
+    consul_sd_configs:
+      - server: 'consul1:8500'
+        services:
+          - 'counter'
