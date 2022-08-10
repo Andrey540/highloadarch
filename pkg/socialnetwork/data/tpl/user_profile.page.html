@@ -1,58 +1,69 @@
 {{template "authorizedLayout" .}}
 
 {{define "header"}}{{end}}
-{{define "title"}}Sign Up{{end}}
+{{define "title"}}User Profile{{end}}
 
 {{define "main"}}
 <div class="row">
-    <label for="username">Nickname: </label>
-    <span id="username" class="username">{{.Profile.Username}}</span>
+    <h2>
+        User Profile
+    </h2>
 </div>
 <div class="row">
-    <label for="firstName">First Name: </label>
-    <span id="firstName" class="firstName">{{.Profile.FirstName}}</span>
+    <label for="username" class="col-sm-2 col-form-label">Nickname: </label>
+    <div class="col-sm-10">
+        <input type="text" readonly id="username" class="form-control-plaintext"  value="{{.Profile.Username}}"/>
+    </div>
 </div>
 <div class="row">
-    <label for="lastName">Last Name: </label>
-    <span id="lastName" class="lastName">{{.Profile.LastName}}</span>
+    <label for="firstName" class="col-sm-2 col-form-label">First Name: </label>
+    <div class="col-sm-10">
+        <input type="text" readonly id="firstName" class="form-control-plaintext"  value="{{.Profile.FirstName}}"/>
+    </div>
 </div>
 <div class="row">
-    <label for="age">Age: </label>
-    <span id="age" class="age">{{.Profile.Age}}</span>
+    <label for="lastName" class="col-sm-2 col-form-label">Last Name: </label>
+    <div class="col-sm-10">
+        <input type="text" readonly id="lastName" class="form-control-plaintext"  value="{{.Profile.LastName}}"/>
+    </div>
 </div>
 <div class="row">
-    <label for="sex">Sex: </label>
-    <span id="sex" class="sex">
-            {{ if eq .Profile.Sex 0 }} Male
-            {{ else if eq .Profile.Sex 1}} Female
-            {{ end }}
-        </span>
+    <label for="age" class="col-sm-2 col-form-label">Age: </label>
+    <div class="col-sm-10">
+        <input type="text" readonly id="age" class="form-control-plaintext"  value="{{.Profile.Age}}"/>
+    </div>
 </div>
 <div class="row">
-    <label for="interests">Interests: </label>
-    <span id="interests" class="interests">{{.Profile.Interests}}</span>
+    <label for="sex" class="col-sm-2 col-form-label">Sex: </label>
+    <div class="col-sm-10">
+        <input type="text" readonly id="sex" class="form-control-plaintext" value="{{ if eq .Profile.Sex 0 }}Male{{ else if eq .Profile.Sex 1}}Female{{ end }}"/>
+    </div>
 </div>
 <div class="row">
-    <label for="city">City: </label>
-    <span id="city" class="city">{{.Profile.City}}</span>
+    <label for="interests" class="col-sm-2 col-form-label">Interests: </label>
+    <div class="col-sm-10">
+        <input type="text" readonly id="interests" class="form-control-plaintext"  value="{{.Profile.Interests}}"/>
+    </div>
 </div>
 <div class="row">
-    <label>Friends: </label>
+    <label for="city" class="col-sm-2 col-form-label">City: </label>
+    <div class="col-sm-10">
+        <input type="text" readonly id="city" class="form-control-plaintext"  value="{{.Profile.City}}"/>
+    </div>
+</div>
+<div class="row">
+    <label class="col-sm-2 col-form-label">Friends: </label>
+    <ul class="col-sm-10" style="list-style:none;">
     {{range .Friends}}
-    <a class="friend" href="/app/profile/{{.ID}}">{{.Username}}</a>
+        <li><a class="friend" href="/app/profile/{{.ID}}">{{.Username}}</a></li>
     {{end}}
+    </ul>
 </div>
 <input type="hidden" id="userId" value="{{.Profile.ID}}">
 {{ if not .IsSelfProfile }}
-<div class="row">
-    <button id="addToFriendsButton" {{ if .IsFriend }} style="display:none" {{ end }}>Add To Friends</button>
-    <button id="removeFromFriendsButton" {{ if not .IsFriend }} style="display:none" {{ end }}>Remove From Friends
-    </button>
-</div>
-<div class="row">
-    <button id="startConversationButton" {{ if not .IsFriend }} style="display:none" {{ end }}>Start conversation
-    </button>
-</div>
+<button id="addToFriendsButton" class="btn btn-primary" {{ if .IsFriend }} style="margin-right:20px;display:none" {{ end }}>Add To Friends</button>
+<button id="removeFromFriendsButton" class="btn btn-primary" {{ if not .IsFriend }} style="margin-right:20px;display:none" {{ end }}>Remove From Friends</button>
+<button id="startConversationButton" class="btn btn-primary" {{ if not .IsFriend }} style="margin-right:20px;display:none" {{ end }}>Start conversation</button>
 {{ end }}
 {{end}}
 {{define "script"}}
@@ -73,8 +84,8 @@
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status === 200) {
                     addToFriendsButton.style.display = "none";
-                    removeFromFriendsButton.style.display = "block";
-                    startConversationButton.style.display = "block";
+                    removeFromFriendsButton.style.display = "inline-block";
+                    startConversationButton.style.display = "inline-block";
                 } else {
                     alert("error");
                 }
@@ -93,7 +104,7 @@
         xhr.onreadystatechange = function () {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status === 200) {
-                    addToFriendsButton.style.display = "block";
+                    addToFriendsButton.style.display = "inline-block";
                     removeFromFriendsButton.style.display = "none";
                     startConversationButton.style.display = "none";
                 } else {

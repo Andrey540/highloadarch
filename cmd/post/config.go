@@ -44,8 +44,11 @@ type config struct {
 
 	MigrationsDir string `envconfig:"migrations_dir"`
 
-	ServeRESTAddress string `envconfig:"serve_rest_address" default:":80"`
-	ServeGRPCAddress string `envconfig:"serve_grpc_address" default:":81"`
+	HTTPServerEnabled int    `envconfig:"http_server_enabled" default:"1"`
+	ServeRESTAddress  string `envconfig:"serve_rest_address" default:":80"`
+	ServeGRPCAddress  string `envconfig:"serve_grpc_address" default:":81"`
+
+	UseTarantool int `envconfig:"use_tarantool" default:"1"`
 
 	ServiceID string `envconfig:"service_id" default:"1"`
 }

@@ -23,6 +23,16 @@
       "presence_stats": true,
       "history_lifetime": 60,
       "history_recover": true
+    },
+    {
+      "name": "message",
+      "anonymous": true,
+      "publish": true,
+      "join_leave": true,
+      "presence": true,
+      "presence_stats": true,
+      "history_lifetime": 60,
+      "history_recover": true
     }
   ]
 }

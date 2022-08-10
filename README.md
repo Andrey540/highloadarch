@@ -1,40 +1,27 @@
 # Учебный проект по курсу Highload Architect
 
-Для запуска сервиса нужно выполнить команду:
-
+Для запуска приложения нужно выполнить команду:
 ```bash
-docker-compose up
+./start.sh
 ```
 
-Для сборки и запуска сервиса нужно выполнить команды:
+Последующие команды нужно выполнить один раз при первом старте приложения.
 
-1) Дать права на запуск bash файла
-
+Запустить автоматическую настройку забикса и дашборда графаны.
 ```bash
-chmod +x generate_data.sh
+chmod +x ./zabbix/scripts/setup-zabbix.sh
+./zabbix/scripts/setup-zabbix.sh
 ```
 
-2) Запустить сборку
+Запустить автоматическое создание дашборда графаны для прометея.
 ```bash
-./build.sh
-```
-
-3) Поднять контейнеты
-```bash
-docker-compose up
-```
-
-Зайти в базу
-
-```bash
-docker exec -it mysql-node-1 mysql -usocialnetwork -ppasswd socialnetwork
-```
-
-Для генерации тестовых данных выполнить команду
-
-```bash
-chmod +x generate_data.sh
-./generate_data.sh
+chmod +x ./prometheus/scripts/setup-prometheus.sh
+./prometheus/scripts/setup-prometheus.sh
 ```
 
 Сервис доступен по url http://127.0.0.1:8881/app
+
+Для отсановки приложения нужно выполнить команду:
+```bash
+./stop.sh
+```

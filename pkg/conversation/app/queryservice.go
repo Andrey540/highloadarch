@@ -18,6 +18,7 @@ type UserMessage struct {
 }
 
 type ConversationQueryService interface {
+	GetConversation(userID, target uuid.UUID) (*UserConversation, error)
 	ListConversations(userID uuid.UUID) ([]*UserConversation, error)
 	ListMessages(userID, conversationID uuid.UUID) ([]*UserMessage, error)
 }

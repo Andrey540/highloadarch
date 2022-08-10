@@ -1,7 +1,7 @@
 {{template "authorizedLayout" .}}
 
 {{define "header"}}{{end}}
-{{define "title"}}Sign Up{{end}}
+{{define "title"}}Users{{end}}
 
 {{define "main"}}
 <div class="row">
@@ -9,10 +9,63 @@
         Users
     </h2>
 </div>
-{{range .}}
-<div class="row">
-    <a class="username" href="/app/profile/{{.ID}}">{{.Username}}</a>
+
+<div class="row height d-flex justify-content-center align-items-center pb-3 mb-3">
+    <div class="input-group">
+        <div class="form-outline">
+            <input type="search" id="searchInput" class="form-control"/>
+        </div>
+        <button type="button" id="searchButton" class="btn btn-primary">Search</button>
+    </div>
 </div>
+
+<ul class="users" id="users"
+    style="list-style:none;height:calc(100% - 200px);height:-webkit-calc(100% - 200px);height:-moz-calc(100% - 200px);overflow: auto">
+    {{range .}}
+    <li class="mb-3">
+        <a class="username" href="/app/profile/{{.ID}}">{{.Username}}</a>
+    </li>
+    {{end}}
+</ul>
+
 {{end}}
+{{define "script"}}
+<script type="text/javascript">
+    let searchButton = document.getElementById('searchButton');
+    let usersHTML = document.getElementById('users');
+    searchButton.addEventListener("click", function () {
+        let userName = document.getElementById('searchInput').value
+        let xhr = new XMLHttpRequest();
+        //open the request
+        if (userName === "") {
+            xhr.open('POST', '/user/api/v1/list' + userName);
+        } else {
+            xhr.open('GET', '/user/api/v1/profile/find?userName=' + userName);
+        }
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        //send the form data
+        xhr.send();
+
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    usersHTML.innerHTML = '';
+                    let response = JSON.parse(xhr.response)
+                    let users = response.users;
+                    for (let i = 0; i < users.length; i++) {
+                        let li = document.createElement('li');
+                        li.setAttribute('class', '"mb-3');
+                        li.innerHTML = `<a class="username" href="/app/profile/`+ users[i].Id + `">`+ users[i].userName + `</a>`;
+                        usersHTML.appendChild(li);
+                    }
+                    console.log(xhr.response);
+                } else {
+                    alert(xhr.response);
+                }
+            }
+        }
+        return false;
+    });
+</script>
 {{end}}
-{{define "script"}}{{end}}

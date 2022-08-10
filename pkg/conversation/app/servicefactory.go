@@ -3,7 +3,12 @@ package app
 import (
 	"github.com/callicoder/go-docker/pkg/common/app"
 	"github.com/callicoder/go-docker/pkg/common/app/event"
+	"github.com/callicoder/go-docker/pkg/common/uuid"
 )
+
+type UserNotifier interface {
+	Notify(userIDs []uuid.UUID, conversationID, messageID, author uuid.UUID, message string) error
+}
 
 type RepositoryFactory interface {
 	ConversationRepository() ConversationRepository

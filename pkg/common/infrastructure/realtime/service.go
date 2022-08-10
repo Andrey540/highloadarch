@@ -37,6 +37,7 @@ func (s *clientService) GetHost(id string) string {
 	return s.getHost(id, s.hosts)
 }
 
+// service.getClient
 func (s *clientService) getHost(id string, hosts []string) string {
 	if len(hosts) == 0 {
 		return ""
@@ -103,6 +104,7 @@ func (s *service) Publish(messages []Message) error {
 	return nil
 }
 
+// clientService.getHost
 func (s *service) getClient(id string) *centrifuge.Client {
 	if len(s.clients) == 0 {
 		return nil

@@ -50,9 +50,11 @@ func (s userQueryService) GetUserProfile(id uuid.UUID) (*app.UserProfileDTO, err
 }
 
 func (s userQueryService) ListUserProfiles(userName string) ([]*app.UserProfileDTO, error) {
-	const sqlQuery = selectUserSQL + ` WHERE u.first_name LIKE ? AND u.last_name LIKE ? ORDER BY u.id LIMIT 30`
+	sqlQuery := `(` + selectUserSQL + ` WHERE u.first_name LIKE ? ORDER BY u.id LIMIT 30) UNION (` +
+		selectUserSQL + ` WHERE u.last_name LIKE ? ORDER BY u.id LIMIT 30) UNION (` +
+		selectUserSQL + ` WHERE u.username LIKE ? ORDER BY u.id LIMIT 30)`
 	userNameParameter := userName + "%"
-	rows, err := s.client.Query(sqlQuery, userNameParameter, userNameParameter)
+	rows, err := s.client.Query(sqlQuery, userNameParameter, userNameParameter, userNameParameter)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

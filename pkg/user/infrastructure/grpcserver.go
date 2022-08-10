@@ -131,7 +131,7 @@ func (s *server) FindProfiles(ctx context.Context, request *api.FindProfilesRequ
 	if err != nil {
 		return nil, err
 	}
-	usersData := make([]*api.UserData, len(users))
+	usersData := []*api.UserData{}
 	for _, user := range users {
 		usersData = append(usersData, &api.UserData{
 			Id:        user.ID.String(),
@@ -195,7 +195,7 @@ func (s *server) ListFriends(ctx context.Context, request *api.ListFriendsReques
 	if err != nil {
 		return nil, err
 	}
-	friendsData := make([]*api.Friend, len(friends))
+	friendsData := []*api.Friend{}
 	for _, friend := range friends {
 		friendsData = append(friendsData, &api.Friend{
 			UserID:   friend.ID.String(),
@@ -218,7 +218,7 @@ func (s *server) ListUsers(ctx context.Context, request *api.ListUsersRequest) (
 	if err != nil {
 		return nil, err
 	}
-	usersData := make([]*api.UserListItem, len(users))
+	usersData := []*api.UserListItem{}
 	for _, user := range users {
 		usersData = append(usersData, &api.UserListItem{
 			UserID:   user.ID.String(),

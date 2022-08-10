@@ -76,6 +76,9 @@ func (c *connection) Start() error {
 }
 
 func (c *connection) Stop() error {
+	if c.amqpConn.IsClosed() {
+		return nil
+	}
 	return c.amqpConn.Close()
 }
 

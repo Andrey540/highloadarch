@@ -13,6 +13,7 @@ const maxNewsCount = 1000
 type newsLineQueryService struct {
 	client          mysql.Client
 	tarantoolClient tarantool.Client
+	useTarantool    bool
 }
 
 type newsLineItem struct {
@@ -46,7 +47,10 @@ func (s newsLineQueryService) ListPosts(userID uuid.UUID) ([]*app.PostDTO, error
 }
 
 func (s newsLineQueryService) ListNews(userID uuid.UUID) ([]*app.NewsLineItem, error) {
-	return s.listNewsTarantool(userID)
+	if s.useTarantool {
+		return s.listNewsTarantool(userID)
+	}
+	return s.listNewsSQL(userID)
 }
 
 func (s newsLineQueryService) listNewsTarantool(userID uuid.UUID) ([]*app.NewsLineItem, error) {
@@ -106,9 +110,10 @@ func (s newsLineQueryService) GetPost(postID uuid.UUID) (*app.PostDTO, error) {
 	return &post, nil
 }
 
-func NewNewsLineQueryService(client mysql.Client, tarantoolClient tarantool.Client) app.NewsLineQueryService {
+func NewNewsLineQueryService(useTarantool bool, client mysql.Client, tarantoolClient tarantool.Client) app.NewsLineQueryService {
 	return &newsLineQueryService{
 		client:          client,
 		tarantoolClient: tarantoolClient,
+		useTarantool:    useTarantool,
 	}
 }

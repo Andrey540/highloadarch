@@ -27,3 +27,8 @@ scrape_configs:
       - server: 'consul1:8500'
         services:
           - 'counter'
+  - job_name: socialnetwork-metrics
+    consul_sd_configs:
+      - server: 'consul1:8500'
+        services:
+          - 'socialnetwork'

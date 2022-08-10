@@ -44,19 +44,22 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 		return err
 	}
 
-	restPort := cnf.ServeRESTAddress[1:len(cnf.ServeRESTAddress)]
-	grpcPort := cnf.ServeGRPCAddress[1:len(cnf.ServeGRPCAddress)]
+	if cnf.HTTPServerEnabled == 1 {
+		restPort := cnf.ServeRESTAddress[1:len(cnf.ServeRESTAddress)]
+		grpcPort := cnf.ServeGRPCAddress[1:len(cnf.ServeGRPCAddress)]
 
-	err = server.ServiceRegistryWithConsul(appID, cnf.ServiceID, restPort, ":"+restPort+"/health", []string{"urlprefix-" + appID + "/"})
-	if err != nil {
-		errorLogger.Println(err)
-		return err
+		err = server.ServiceRegistryWithConsul(appID, cnf.ServiceID, restPort, ":"+restPort+"/health", []string{"urlprefix-" + appID + "/"})
+		if err != nil {
+			errorLogger.Println(err)
+			return err
+		}
+		err = server.ServiceRegistryWithConsul(appID+"-grpc", cnf.ServiceID, grpcPort, ":"+restPort+"/health", []string{"urlprefix-/api.Conversation" + " proto=grpc grpcservername=" + cnf.ServiceID})
+		if err != nil {
+			errorLogger.Println(err)
+			return err
+		}
 	}
-	err = server.ServiceRegistryWithConsul(appID+"-grpc", cnf.ServiceID, grpcPort, ":"+restPort+"/health", []string{"urlprefix-/api.Conversation" + " proto=grpc grpcservername=" + cnf.ServiceID})
-	if err != nil {
-		errorLogger.Println(err)
-		return err
-	}
+
 	connector := vitess.NewConnector()
 	err = connector.Open(cnf.dbDsn(), vitess.Config{MaxConnections: cnf.DBMaxConn, ConnectionLifetime: time.Duration(cnf.DBConnectionLifetime) * time.Second}, "@primary")
 	if err != nil {
@@ -81,6 +84,17 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 		}
 	}()
 
+	realtimeHosts, err := cnf.realtimeHosts()
+	if err != nil {
+		return err
+	}
+	userNotifier, err := infrastructure.NewUserNotifier(realtimeHosts, "message")
+	if err != nil {
+		return err
+	}
+	// noinspection GoUnhandledErrorResult
+	defer userNotifier.Close()
+
 	commonUnitOfWorkFactory := infrastructure.NewUnitOfWorkFactory(mysqlClient, cnf.DBName)
 	transports, connections, err1 := server.InitEventTransport(nil, cnf.amqpConf(), logger, errorLogger)
 
@@ -95,7 +109,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	commandHandlerFactory := command.NewCommandHandlerFactory()
 	commandsHandler := commonapp.NewCommandsHandler(unitOfWorkFactory, commandHandlerFactory)
 
-	handlerFactory := app.NewEventHandlerFactory()
+	handlerFactory := app.NewEventHandlerFactory(userNotifier, errorLogger)
 	eventsHandler := event.NewEventsHandler(unitOfWorkFactory, handlerFactory, logger, errorLogger)
 
 	for _, transport := range transports {

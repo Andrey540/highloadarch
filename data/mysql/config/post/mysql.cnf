@@ -1,7 +1,7 @@
 [mysqld]
 binlog_format = ROW
 server_id = 1
-log-bin = mysql-bin
+log_bin = mysql-bin-1.log
 interactive_timeout = 3600
 wait_timeout = 3600
 max_allowed_packet = 32M

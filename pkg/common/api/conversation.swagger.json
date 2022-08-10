@@ -41,6 +41,38 @@
         ]
       }
     },
+    "/conversation/api/v1/info": {
+      "post": {
+        "operationId": "GetConversation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/apiGetConversationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/apiGetConversationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Conversation"
+        ]
+      }
+    },
     "/conversation/api/v1/list": {
       "get": {
         "operationId": "ListConversations",
@@ -193,6 +225,28 @@
       },
       "required": [
         "messageID"
+      ]
+    },
+    "apiGetConversationRequest": {
+      "type": "object",
+      "properties": {
+        "conversationID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "conversationID"
+      ]
+    },
+    "apiGetConversationResponse": {
+      "type": "object",
+      "properties": {
+        "companionID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "companionID"
       ]
     },
     "apiListConversationsResponse": {

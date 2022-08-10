@@ -114,12 +114,19 @@ func (t *transport) SetHandler(handler event.Handler) {
 }
 
 func (t *transport) getRoutingKey(routingID string, publishingMode int) int {
+	if publishingMode == 1 {
+		return 1
+	}
 	bytes := []byte(routingID)
 	sum := 0
 	for _, item := range bytes {
 		sum += int(item)
 	}
-	return sum % publishingMode
+	result := sum % publishingMode
+	if result == 0 {
+		result = 1
+	}
+	return result
 }
 
 func NewEventTransport(queueName string, errorLogger *stdlog.Logger, suppressEventsReading bool, workersCount int, routingKey string) Transport {

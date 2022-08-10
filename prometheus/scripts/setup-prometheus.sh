@@ -125,3 +125,24 @@ else
     echo $POST |jq .
     sleep 1
 fi
+
+# Import Socialnetwork dashboard
+POST=$(curl -s --insecure \
+-H "Accept: application/json" \
+-H "Content-Type: application/json;charset=UTF-8" \
+-H "Authorization:Bearer $GRF_API_KEY" \
+-d "@./grafana/dashboards/socialnetwork_dashboard.json" \
+-X POST "$GRF_SERVER_URL/api/dashboards/db" |jq .)
+
+if [[ "$POST" == *"success"* ]]; then
+    echo -n "Import Socialnetwork dashboard:"
+    echo -ne "\t\t\t" && Done
+    sleep 1
+else
+    echo ""
+    echo -n "Import Socialnetwork dashboard:"
+    echo -ne "\t\t" && Failed
+    echo -n "An error occured. Please check the error output"
+    echo $POST |jq .
+    sleep 1
+fi

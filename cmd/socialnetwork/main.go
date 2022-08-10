@@ -48,6 +48,7 @@ type ListUserItem struct {
 }
 
 type UserConversationItem struct {
+	ConversationID string
 	UserID         string
 	Username       string
 	UnreadMessages int
@@ -101,9 +102,12 @@ type NewPostData struct {
 }
 
 type ConversationPage struct { // nolint: maligned
-	ID       string
-	UserName string
-	Messages []MessageData
+	ID           string
+	UserName     string
+	Messages     []MessageData
+	UserID       string
+	Companion    string
+	RealtimeHost string
 }
 
 type MyPostsPage struct { // nolint: maligned
@@ -138,6 +142,13 @@ func main() {
 func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	metricsHandler, err := metrics.NewPrometheusMetricsHandler()
 	if err != nil {
+		return err
+	}
+
+	restPort := cnf.ServeRESTAddress[1:len(cnf.ServeRESTAddress)]
+	err = server.ServiceRegistryWithConsul(appID, cnf.ServiceID, restPort, ":"+restPort+"/health", []string{"urlprefix-" + appID + "/"})
+	if err != nil {
+		errorLogger.Println(err)
 		return err
 	}
 
@@ -194,8 +205,8 @@ func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.
 	var httpServer *http.Server
 	serverHub.Serve(func() error {
 		router := mux.NewRouter()
-		router.HandleFunc("/", checkHealth(sessionService)).Methods(http.MethodGet)
-		router.HandleFunc("/health", checkHealth(sessionService)).Methods(http.MethodGet)
+		router.HandleFunc("/", checkHealth(sessionService, errorLogger)).Methods(http.MethodGet)
+		router.HandleFunc("/health", checkHealth(sessionService, errorLogger)).Methods(http.MethodGet)
 
 		registerUserTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/register.page.html")...))
 		viewUserTpl := template.Must(template.ParseFiles(getTemplateFiles("/socialnetwork/data/tpl/user_profile.page.html")...))
@@ -217,7 +228,7 @@ func serveHTTP(config *config, serverHub *server.Hub, userService inrastructure.
 		router.HandleFunc("/app/profile/{id}", getUserProfile(userService, viewUserTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/logout", logoutUserWithRedirect(sessionService)).Methods(http.MethodGet)
 		router.HandleFunc("/app/user/list", listUsers(userService, listUsersTpl)).Methods(http.MethodGet)
-		router.HandleFunc("/app/conversation/user/{id}", getConversation(userService, conversationService, conversationTpl)).Methods(http.MethodGet)
+		router.HandleFunc("/app/conversation/user/{id}", getConversation(userService, conversationService, realtimeClientService, conversationTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/conversation/list", listConversations(userService, conversationService, counterService, conversationsTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/post/list", getMyPosts(postService, myPostsTpl)).Methods(http.MethodGet)
 		router.HandleFunc("/app/post/news", getNewPosts(postService, userService, realtimeClientService, newPostsTpl)).Methods(http.MethodGet)
@@ -435,7 +446,7 @@ func listUsers(userService inrastructure.UserService, tpl *template.Template) ht
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		var result = make([]ListUserItem, len(users))
+		var result = make([]ListUserItem, 0, len(users))
 		for _, item := range users {
 			result = append(result, listUserResponse(item))
 		}
@@ -447,9 +458,10 @@ func listUsers(userService inrastructure.UserService, tpl *template.Template) ht
 	}
 }
 
-func getConversation(userService inrastructure.UserService, conversationService inrastructure.ConversationService, tpl *template.Template) http.HandlerFunc {
+func getConversation(userService inrastructure.UserService, conversationService inrastructure.ConversationService, realtimeClientService realtime.ClientService, tpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		conversationID, err := conversationService.GetConversationID(r)
+		conversationID := request.GetIDFromRequest(r)
+		companionID, err := conversationService.GetCompanion(r, conversationID)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
 			return
@@ -466,13 +478,14 @@ func getConversation(userService inrastructure.UserService, conversationService 
 			messageIDs = append(messageIDs, message.Id)
 		}
 		loggedUserID := inrastructure.GetUserIDFromContext(r)
-		userIDs = append(userIDs, loggedUserID)
+		userIDs = append(userIDs, loggedUserID, companionID)
 		usersMap, err := getUsersMap(r, userService, userIDs)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
 			return
 		}
 		loggedUser := usersMap[loggedUserID]
+		companion := usersMap[companionID]
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		messagesData, err := getMessages(usersMap, messages)
 		if err != nil {
@@ -484,7 +497,7 @@ func getConversation(userService inrastructure.UserService, conversationService 
 			response.WriteErrorResponse(err, w)
 			return
 		}
-		page := ConversationPage{ID: conversationID, UserName: loggedUser.UserName, Messages: messagesData}
+		page := ConversationPage{ID: conversationID, UserName: loggedUser.UserName, Companion: companion.UserName, Messages: messagesData, UserID: loggedUserID, RealtimeHost: realtimeClientService.GetHost(loggedUserID)}
 		err = tpl.Execute(w, page)
 		if err != nil {
 			response.WriteErrorResponse(err, w)
@@ -661,7 +674,7 @@ func getProfile(user *api.UserData) UserData {
 }
 
 func getFriends(friends []*api.Friend) []FriendData {
-	result := make([]FriendData, len(friends))
+	result := []FriendData{}
 	for _, friend := range friends {
 		result = append(result, FriendData{
 			ID:       friend.UserID,
@@ -703,7 +716,7 @@ func getConversations(usersMap map[string]*api.UserListItem, unreadMessagesMap m
 			if count, found1 := unreadMessagesMap[conversation.Id]; found1 {
 				unreadMessagesCount = count
 			}
-			result = append(result, UserConversationItem{UserID: conversation.UserID, Username: user.UserName, UnreadMessages: unreadMessagesCount})
+			result = append(result, UserConversationItem{ConversationID: conversation.Id, UserID: conversation.UserID, Username: user.UserName, UnreadMessages: unreadMessagesCount})
 		}
 	}
 	return result, nil
@@ -737,10 +750,11 @@ func getNews(usersMap map[string]*api.UserListItem, posts []*api.NewsItem) ([]Ne
 	return result, nil
 }
 
-func checkHealth(sessionService redis.SessionService) http.HandlerFunc {
+func checkHealth(sessionService redis.SessionService, errorLogger *stdlog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		err := sessionService.Ping()
 		if err != nil {
+			errorLogger.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = io.WriteString(w, http.StatusText(http.StatusInternalServerError))
 			return

@@ -13,6 +13,25 @@ type conversationQueryService struct {
 	dbName string
 }
 
+func (s conversationQueryService) GetConversation(conversationID, userID uuid.UUID) (*app.UserConversation, error) {
+	sqlQuery := `SELECT conversation_id, target FROM ` + s.dbName + `.user_conversation WHERE conversation_id=? AND user_id=?`
+	rows, err := s.client.Query(sqlQuery, mysql.BinaryUUID(conversationID), mysql.BinaryUUID(userID))
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if rows.Err() != nil {
+		return nil, errors.WithStack(rows.Err())
+	}
+
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, nil
+	}
+	var conversation app.UserConversation
+	err1 := rows.Scan(&conversation.ID, &conversation.UserID)
+	return &conversation, errors.WithStack(err1)
+}
+
 func (s conversationQueryService) ListMessages(userID, conversationID uuid.UUID) ([]*app.UserMessage, error) {
 	sqlQuery := `SELECT
 				   m.id, m.user_id, m.conversation_id, m.text, MAX(urm.id IS NOT NULL)

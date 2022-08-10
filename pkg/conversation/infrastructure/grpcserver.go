@@ -41,6 +41,26 @@ func (s *server) StartConversation(ctx context.Context, request *api.StartConver
 	return &api.StartConversationResponse{ConversationID: id.(uuid.UUID).String()}, err
 }
 
+func (s *server) GetConversation(ctx context.Context, request *api.GetConversationRequest) (*api.GetConversationResponse, error) {
+	err := commonserver.Authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	conversationID, err := uuid.FromString(request.ConversationID)
+	if err != nil {
+		return nil, err
+	}
+	userID, err := uuid.FromString(commonserver.GetUserIDFromGRPCMetadata(ctx))
+	if err != nil {
+		return nil, err
+	}
+	conversation, err := s.queryService.GetConversation(conversationID, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &api.GetConversationResponse{CompanionID: conversation.UserID.String()}, err
+}
+
 func (s *server) ListConversations(ctx context.Context, request *api.ListConversationsRequest) (*api.ListConversationsResponse, error) {
 	err := commonserver.Authenticate(ctx)
 	if err != nil {

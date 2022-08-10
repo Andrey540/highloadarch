@@ -9,16 +9,17 @@
         Posts
     </h2>
 </div>
-<div class="posts" id="posts">
+
+<ul class="posts" id="posts" style="margin-top:20px;padding:0;list-style:none;height:calc(100% - 400px);height:-webkit-calc(100% - 400px);height:-moz-calc(100% - 400px);overflow-y: auto;overflow-x: hidden">
     {{range .Posts}}
-    <div class="row">
+    <li class="row border-bottom pb-3 mb-3">
         <span id="{{.ID}}" class="title">Title: {{.Title}}</span>
         <div class="text">Text: {{.Text}}</div>
-    </div>
+    </li>
     {{end}}
-</div>
+</ul>
 
-<div class="row">
+<div class="row" style="margin-top:30px">
     <form name="addPost" id="addPostForm" action="" method="POST">
         <div class="form-group">
             <label for="title">Title</label>
@@ -28,7 +29,7 @@
             <label for="post">Text</label>
             <textarea class="form-control" id="post" placeholder="Text" name="text"></textarea>
         </div>
-        <button type="submit" class="btn btn-default">Add Post</button>
+        <button type="submit" class="btn btn-primary" style="margin-top:20px">Add Post</button>
     </form>
 </div>
 {{end}}
@@ -57,13 +58,13 @@
                 if (xhr.status === 200) {
                     let response = JSON.parse(xhr.response)
                     let postId = response.post_id;
-                    var div = document.createElement('div');
-                    div.setAttribute('class', 'row');
-                    div.innerHTML = `
+                    let li = document.createElement('li');
+                    li.setAttribute('class', 'row border-bottom pb-3 mb-3');
+                    li.innerHTML = `
                         <span id="` + postId + `" class="title">Title: ` + title + `</span>
                         <div class="text">Text: ` + text + `</div>
                     `;
-                    document.getElementById('posts').appendChild(div);
+                    document.getElementById('posts').appendChild(li);
                 } else {
                     alert(xhr.response);
                 }

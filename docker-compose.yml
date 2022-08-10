@@ -2,7 +2,7 @@ version: '3.5'
 
 services:
   mysql-node-1:
-    image: percona/percona-server:8.0
+    image: percona/percona-server:8.0.26
     container_name: mysql-node-1
     hostname: mysql-node-1
     environment:
@@ -21,7 +21,7 @@ services:
       - "${PWD}/data/mysql/config/common/:/etc/my.cnf.d"
 
   mysql-node-2:
-    image: percona/percona-server:8.0
+    image: percona/percona-server:8.0.26
     container_name: mysql-node-2
     hostname: mysql-node-2
     environment:
@@ -39,7 +39,7 @@ services:
       - mysql-node-1
 
   mysql-node-3:
-    image: percona/percona-server:8.0
+    image: percona/percona-server:8.0.26
     container_name: mysql-node-3
     hostname: mysql-node-3
     environment:
@@ -56,6 +56,50 @@ services:
     depends_on:
       - mysql-node-1
 
+  redis-node-1:
+    image: 'bitnami/redis:latest'
+    container_name: redis-node-1
+    environment:
+      - REDIS_REPLICATION_MODE=master
+      - ALLOW_EMPTY_PASSWORD=yes
+
+  redis-node-2: &redis-slave
+    image: 'bitnami/redis:latest'
+    container_name: redis-node-2
+    environment:
+      - REDIS_REPLICATION_MODE=slave
+      - REDIS_MASTER_HOST=redis-node-1
+      - ALLOW_EMPTY_PASSWORD=yes
+    depends_on:
+      - redis-node-1
+
+  redis-node-3:
+    <<: *redis-slave
+    container_name: redis-node-3
+
+  redis-sentinel-1: &redis-sentinel
+    image: 'bitnami/redis-sentinel:latest'
+    container_name: redis-sentinel-1
+    environment:
+      - REDIS_MASTER_HOST=redis-node-1
+      - REDIS_SENTINEL_DOWN_AFTER_MILLISECONDS=30000
+      - REDIS_SENTINEL_FAILOVER_TIMEOUT=120000
+      - REDIS_SENTINEL_RESOLVE_HOSTNAMES=yes
+    depends_on:
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+    ports:
+      - '26379-26381:26379'
+
+  redis-sentinel-2:
+    <<: *redis-sentinel
+    container_name: redis-sentinel-2
+
+  redis-sentinel-3:
+    <<: *redis-sentinel
+    container_name: redis-sentinel-3
+
   haproxy:
     image: haproxytech/haproxy-alpine:2.4
     container_name: haproxy
@@ -67,6 +111,12 @@ services:
     depends_on:
       - mysql-node-2
       - mysql-node-3
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+      - consul1
+      - consul2
+      - consul3
 
   nginx:
     image: nginx:1.21.6
@@ -81,7 +131,7 @@ services:
       - socialnetwork-2
 
   mysql-post:
-    image: mysql:5.7
+    image: mysql:5.7.29
     container_name: mysql-post
     hostname: mysql-post
     restart: unless-stopped
@@ -99,10 +149,6 @@ services:
       interval: 2s
       retries: 20
 
-  redis:
-    image: "redis"
-    container_name: redis
-
   rabbitmq:
     image: "rabbitmq:3-management"
     container_name: rabbitmq
@@ -113,7 +159,7 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
 
   tarantool:
-    image: tarantool/tarantool:latest
+    image: tarantool/tarantool:1.10.10
     container_name: tarantool
     command: [ "tarantool", "/opt/tarantool/tarantool.lua" ]
     volumes:
@@ -131,7 +177,7 @@ services:
       - tarantool
 
   realtime-1:
-    image: "centrifugo/centrifugo:v3.1.1"
+    image: centrifugo/centrifugo:v3.1.1
     container_name: realtime-1
     ports:
       - "8886:8000"
@@ -145,7 +191,7 @@ services:
       - "${PWD}/centrifugo:/centrifugo"
 
   realtime-2:
-    image: "centrifugo/centrifugo:v3.1.1"
+    image: centrifugo/centrifugo:v3.1.1
     container_name: realtime-2
     ports:
       - "8887:8000"
@@ -159,13 +205,16 @@ services:
       - "${PWD}/centrifugo:/centrifugo"
 
   socialnetwork-1:
-    image: "andrey540/socialnetwork:v12"
+    image: "andrey540/socialnetwork:v13"
     container_name: socialnetwork-1
     environment:
-      REDIS_HOST: redis
+      SERVICE_ID: socialnetwork-1
+      REDIS_HOST: haproxy
+      REDIS_PORT: 6379
       SERVE_REST_ADDRESS: :80
       SERVICE_REST_ADDRESS: http://fabio:9999
       SERVICE_GRPC_ADDRESS: fabio-grpc:9999
+      CONSUL_HTTP_ADDR: consul1:8500
       REALTIME_HOSTS: '[
         "ws://127.0.0.1:8886/connection/websocket",
         "ws://127.0.0.1:8887/connection/websocket"
@@ -175,16 +224,20 @@ services:
       - conversation-1
       - post-1
       - counter-1
-      - redis
+      - haproxy
+      - consul1
 
   socialnetwork-2:
-    image: "andrey540/socialnetwork:v12"
+    image: "andrey540/socialnetwork:v13"
     container_name: socialnetwork-2
     environment:
-      REDIS_HOST: redis
+      SERVICE_ID: socialnetwork-2
+      REDIS_HOST: haproxy
+      REDIS_PORT: 6379
       SERVE_REST_ADDRESS: :80
       SERVICE_REST_ADDRESS: http://fabio:9999
       SERVICE_GRPC_ADDRESS: fabio-grpc:9999
+      CONSUL_HTTP_ADDR: consul1:8500
       REALTIME_HOSTS: '[
         "ws://127.0.0.1:8886/connection/websocket",
         "ws://127.0.0.1:8887/connection/websocket"
@@ -194,10 +247,11 @@ services:
       - conversation-1
       - post-1
       - counter-1
-      - redis
+      - haproxy
+      - consul1
 
   user-1:
-    image: "andrey540/user:v12"
+    image: "andrey540/user:v13"
     container_name: user-1
     environment:
       SERVICE_ID: user-1
@@ -219,7 +273,7 @@ services:
       - haproxy
 
   conversation-1:
-    image: "andrey540/conversation:v12"
+    image: "andrey540/conversation:v13"
     container_name: conversation-1
     environment:
       SERVICE_ID: conversation-1
@@ -235,9 +289,45 @@ services:
       AMQP_USER: guest
       AMQP_PASSWORD: guest
       AMQP_ENABLED: 1
+      AMQP_SUPPRESS_EVENT_READING: 1
       SERVE_REST_ADDRESS: :80
       SERVE_GRPC_ADDRESS: :81
       CONSUL_HTTP_ADDR: consul1:8500
+    healthcheck:
+      interval: 30s
+      retries: 15
+      test:
+        - CMD-SHELL
+        - wget -nv -t1 --spider localhost:80/health
+    depends_on:
+      - vtgate
+      - vtctld
+
+  conversation-worker-1:
+    image: "andrey540/conversation:v13"
+    container_name: conversation-worker-1
+    environment:
+      SERVICE_ID: conversation-worker-1
+      SCHEMA_HOST: vtctld
+      SCHEMA_PORT: 15999
+      DB_HOST: vtgate
+      DB_PORT: 15999
+      DB_NAME: conversation_keyspace
+      DB_USER: socialnetwork
+      DB_PASSWORD: passwd
+      DB_MAX_CONN: 50
+      AMQP_HOST: rabbitmq
+      AMQP_USER: guest
+      AMQP_PASSWORD: guest
+      AMQP_ENABLED: 1
+      HTTP_SERVER_ENABLED: 0
+      SERVE_REST_ADDRESS: :80
+      SERVE_GRPC_ADDRESS: :81
+      CONSUL_HTTP_ADDR: consul1:8500
+      REALTIME_HOSTS: '[
+              "ws://realtime-1:8000/connection/websocket",
+              "ws://realtime-2:8000/connection/websocket"
+            ]'
     healthcheck:
       interval: 30s
       retries: 15
@@ -252,7 +342,7 @@ services:
       - fabio-grpc
 
   counter-1:
-    image: "andrey540/counter:v12"
+    image: "andrey540/counter:v13"
     container_name: counter-1
     environment:
       SERVICE_ID: counter-1
@@ -282,7 +372,7 @@ services:
       - vtctld
 
   post-1:
-    image: "andrey540/post:v12"
+    image: "andrey540/post:v13"
     container_name: post-1
     environment:
       SERVICE_ID: post-1
@@ -299,6 +389,7 @@ services:
       AMQP_ENABLED: 1
       AMQP_SUPPRESS_EVENT_READING: 1
       WORKERS_COUNT: 2
+      USE_TARANTOOL: 1
       SERVE_REST_ADDRESS: :80
       SERVE_GRPC_ADDRESS: :81
       CONSUL_HTTP_ADDR: consul1:8500
@@ -315,7 +406,7 @@ services:
       - fabio-grpc
 
   post-worker-1:
-    image: "andrey540/post:v12"
+    image: "andrey540/post:v13"
     container_name: post-worker-1
     environment:
       TARANTOOL_HOST: tarantool
@@ -331,6 +422,7 @@ services:
       AMQP_ENABLED: 1
       WORKERS_COUNT: 2
       AMQP_ROUTING_KEY: 1
+      HTTP_SERVER_ENABLED: 0
       SERVE_REST_ADDRESS: :80
       SERVE_GRPC_ADDRESS: :81
       REALTIME_HOSTS: '[
@@ -349,7 +441,7 @@ services:
       - realtime-2
 
   post-worker-2:
-    image: "andrey540/post:v12"
+    image: "andrey540/post:v13"
     container_name: post-worker-2
     environment:
       TARANTOOL_HOST: tarantool
@@ -365,6 +457,7 @@ services:
       AMQP_ENABLED: 1
       WORKERS_COUNT: 2
       AMQP_ROUTING_KEY: 2
+      HTTP_SERVER_ENABLED: 0
       SERVE_REST_ADDRESS: :80
       SERVE_GRPC_ADDRESS: :81
       REALTIME_HOSTS: '[
@@ -383,7 +476,7 @@ services:
       - realtime-2
 
   fabio:
-    image: fabiolb/fabio:latest
+    image: fabiolb/fabio:1.6.0
     environment:
       - registry_consul_addr=consul1:8500 # environment variable for consul service address
       - proxy_strategy=rr # environment variable for load balancing strategy. rr is round-robin
@@ -393,7 +486,7 @@ services:
       - consul1
 
   fabio-grpc:
-    image: fabiolb/fabio:latest
+    image: fabiolb/fabio:1.6.0
     environment:
       - registry_consul_addr=consul1:8500 # environment variable for consul service address
       - proxy_strategy=rr # environment variable for load balancing strategy. rr is round-robin
@@ -407,7 +500,7 @@ services:
   consul1:
     command: agent -server -bootstrap-expect 3 -ui -disable-host-node-id -client 0.0.0.0
     hostname: consul1
-    image: consul:latest
+    image: consul:1.12.3
     ports:
       - 8400:8400
       - 8500:8500
@@ -416,7 +509,7 @@ services:
   consul2:
     command: agent -server -retry-join consul1 -disable-host-node-id
     hostname: consul2
-    image: consul:latest
+    image: consul:1.12.3
     expose:
       - "8400"
       - "8500"
@@ -427,7 +520,7 @@ services:
   consul3:
     command: agent -server -retry-join consul1 -disable-host-node-id
     hostname: consul3
-    image: consul:latest
+    image: consul:1.12.3
     expose:
       - "8400"
       - "8500"
@@ -456,7 +549,7 @@ services:
       - SCHEMA_FILES=conversation_keyspace_schema_file.sql
       - POST_LOAD_FILE=
       - EXTERNAL_DB=0
-    image: vitess/lite:${VITESS_TAG:-latest}
+    image: vitess/lite:v0.13.1
     volumes:
       - "${PWD}/vitess:/script"
 
@@ -480,7 +573,7 @@ services:
       - SCHEMA_FILES=counter_keyspace_schema_file.sql
       - POST_LOAD_FILE=
       - EXTERNAL_DB=0
-    image: vitess/lite:${VITESS_TAG:-latest}
+    image: vitess/lite:v0.13.1
     volumes:
       - "${PWD}/vitess:/script"
 
@@ -492,7 +585,7 @@ services:
       -topo_global_root vitess/global -cell test -workflow_manager_init -workflow_manager_use_election
       -service_map ''grpc-vtctl'' -backup_storage_implementation file -file_backup_storage_root
       /vt/vtdataroot/backups -logtostderr=true -port 8080 -grpc_port 15999 '
-    image: vitess/lite:${VITESS_TAG:-latest}
+    image: vitess/lite:v0.13.1
     ports:
       - 15000:8080
       - "15999"
@@ -514,7 +607,7 @@ services:
       - vttablet101
       - vttablet102
       - vttablet201
-    image: vitess/lite:${VITESS_TAG:-latest}
+    image: vitess/lite:v0.13.1
     ports:
       - 15099:8080
       - "15999"
@@ -535,7 +628,7 @@ services:
       - EXTERNAL_DB=0
       - DB_USER=
       - DB_PASS=
-    image: vitess/lite:${VITESS_TAG:-latest}
+    image: vitess/lite:v0.13.1
     ports:
       - 13000:3000
     volumes:
@@ -571,13 +664,14 @@ services:
         - CMD-SHELL
         - curl -s --fail --show-error localhost:8080/debug/health
       timeout: 10s
-    image: vitess/lite:${VITESS_TAG:-latest}
+    image: vitess/lite:v0.13.1
     ports:
       - 15101:8080
       - "15999"
       - "3306"
     volumes:
       - "${PWD}/vitess:/script"
+      - "socialnetwork-db-tablet101-data:/var/lib/mysql"
 
   vttablet102:
     command:
@@ -609,13 +703,14 @@ services:
         - CMD-SHELL
         - curl -s --fail --show-error localhost:8080/debug/health
       timeout: 10s
-    image: vitess/lite:${VITESS_TAG:-latest}
+    image: vitess/lite:v0.13.1
     ports:
       - 15102:8080
       - "15999"
       - "3306"
     volumes:
       - "${PWD}/vitess:/script"
+      - "socialnetwork-db-tablet102-data:/var/lib/mysql"
 
   vttablet201:
     command:
@@ -647,13 +742,14 @@ services:
         - CMD-SHELL
         - curl -s --fail --show-error localhost:8080/debug/health
       timeout: 10s
-    image: vitess/lite:${VITESS_TAG:-latest}
+    image: vitess/lite:v0.13.1
     ports:
       - 15201:8080
       - "15999"
       - "3306"
     volumes:
       - "${PWD}/vitess:/script"
+      - "socialnetwork-db-tablet201-data:/var/lib/mysql"
 
   vtwork:
     command:
@@ -664,7 +760,7 @@ services:
       -port 8080 -grpc_port 15999 -use_v3_resharding_mode=true '
     depends_on:
       - vtctld
-    image: vitess/lite:${VITESS_TAG:-latest}
+    image: vitess/lite:v0.13.1
     ports:
       - "8080"
       - "15999"
@@ -698,11 +794,12 @@ services:
     env_file:
       - ./zabbix/configs/.env_srv
     environment:
+      DB_SERVER_HOST: mysql-zabbix
       MYSQL_ROOT_PASSWORD: root
       MYSQL_USER: zabbix
       MYSQL_PASSWORD: zabbix
     depends_on:
-      - mysql-server
+      - mysql-zabbix
     stop_grace_period: 30s
     sysctls:
       - net.ipv4.ip_local_port_range=1024 65000
@@ -734,10 +831,11 @@ services:
     env_file:
       - ./zabbix/configs/.env_web
     environment:
+      DB_SERVER_HOST: mysql-zabbix
       MYSQL_USER: zabbix
       MYSQL_PASSWORD: zabbix
     depends_on:
-      - mysql-server
+      - mysql-zabbix
       - zabbix-server
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/" ]
@@ -806,7 +904,7 @@ services:
       com.zabbix.component: "snmptraps"
       com.zabbix.os: "alpine"
 
-  mysql-server:
+  mysql-zabbix:
     image: mysql:8.0
     command:
       - mysqld
@@ -860,6 +958,9 @@ volumes:
   socialnetwork-db-data-1:
   socialnetwork-db-data-2:
   socialnetwork-db-data-3:
+  socialnetwork-db-tablet101-data:
+  socialnetwork-db-tablet102-data:
+  socialnetwork-db-tablet201-data:
   socialnetwork-db-post-data:
   socialnetwork-db-tarantool:
   socialnetwork-db-zabbix:

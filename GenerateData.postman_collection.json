@@ -53,7 +53,7 @@
 					}
 				},
 				"url": {
-					"raw": "http://127.0.0.1:8884/v1/register",
+					"raw": "http://127.0.0.1:8881/api/v1/register",
 					"protocol": "http",
 					"host": [
 						"127",
@@ -61,8 +61,9 @@
 						"0",
 						"1"
 					],
-					"port": "8884",
+					"port": "8881",
 					"path": [
+						"api",
 						"v1",
 						"register"
 					]

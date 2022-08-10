@@ -9,10 +9,14 @@
         Conversations
     </h2>
 </div>
-{{range .Conversations}}
-<div class="row">
-    <a class="username" href="/app/conversation/user/{{.UserID}}">{{.Username}}</a><span> ({{.UnreadMessages}})</span>
-</div>
-{{end}}
+
+<ul class="conversations" style="list-style:none;">
+    {{range .Conversations}}
+    <li class="pb-3 mb-3">
+        <a class="username" href="/app/conversation/user/{{.ConversationID}}">{{.Username}}</a><span> ({{.UnreadMessages}})</span>
+    </li>
+    {{end}}
+</ul>
+
 {{end}}
 {{define "script"}}{{end}}

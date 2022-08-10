@@ -13,14 +13,15 @@
 </div>
 <input type="hidden" id="realtimeHost" value="{{.RealtimeHost}}">
 <input type="hidden" id="userId" value="{{.UserID}}">
-<div class="posts" id="posts">
+
+<ul class="posts" id="posts" style="margin-top:20px;padding:0;list-style:none;height:calc(100% - 150px);height:-webkit-calc(100% - 150px);height:-moz-calc(100% - 150px);overflow-y: auto;overflow-x: hidden">
     {{range .Posts}}
-    <div class="row post" id="{{.ID}}">
+    <li class="row post border-bottom pb-3 mb-3" id="{{.ID}}">
         <div class="author">Author: {{.Author}}</div>
         <div class="title">Title: {{.Title}}</div>
-    </div>
+    </li>
     {{end}}
-</div>
+</ul>
 
 {{end}}
 {{define "script"}}
@@ -37,14 +38,18 @@
 
     const centrifuge = new Centrifuge(realtimeHost);
     centrifuge.subscribe("post:" + userId, function (ctx) {
-        var div = document.createElement('div');
-        div.setAttribute('class', 'row post');
-        div.setAttribute('id', ctx.data.post_id);
-        div.innerHTML = `
+        var li = document.createElement('li');
+        li.setAttribute('class', 'row post border-bottom pb-3 mb-3');
+        li.setAttribute('id', ctx.data.post_id);
+        li.innerHTML = `
                         <div class="author">Author: ` + ctx.data.author + `</div>
                         <div class="title">Title: ` + ctx.data.title + `</div>
                     `;
-        document.getElementById('posts').appendChild(div);
+        li.addEventListener('click', function () {
+            window.location.href = '/app/post/' + this.id
+            return false;
+        }, false);
+        document.getElementById('posts').appendChild(li);
     });
 
     centrifuge.connect();

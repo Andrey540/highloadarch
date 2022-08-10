@@ -44,18 +44,20 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 		return err
 	}
 
-	restPort := cnf.ServeRESTAddress[1:len(cnf.ServeRESTAddress)]
-	grpcPort := cnf.ServeGRPCAddress[1:len(cnf.ServeGRPCAddress)]
+	if cnf.HTTPServerEnabled == 1 {
+		restPort := cnf.ServeRESTAddress[1:len(cnf.ServeRESTAddress)]
+		grpcPort := cnf.ServeGRPCAddress[1:len(cnf.ServeGRPCAddress)]
 
-	err = server.ServiceRegistryWithConsul(appID, cnf.ServiceID, restPort, ":"+restPort+"/health", []string{"urlprefix-" + appID + "/"})
-	if err != nil {
-		errorLogger.Println(err)
-		return err
-	}
-	err = server.ServiceRegistryWithConsul(appID+"-grpc", cnf.ServiceID, grpcPort, ":"+restPort+"/health", []string{"urlprefix-/api.Post" + " proto=grpc grpcservername=" + cnf.ServiceID})
-	if err != nil {
-		errorLogger.Println(err)
-		return err
+		err = server.ServiceRegistryWithConsul(appID, cnf.ServiceID, restPort, ":"+restPort+"/health", []string{"urlprefix-" + appID + "/"})
+		if err != nil {
+			errorLogger.Println(err)
+			return err
+		}
+		err = server.ServiceRegistryWithConsul(appID+"-grpc", cnf.ServiceID, grpcPort, ":"+restPort+"/health", []string{"urlprefix-/api.Post" + " proto=grpc grpcservername=" + cnf.ServiceID})
+		if err != nil {
+			errorLogger.Println(err)
+			return err
+		}
 	}
 
 	connector := mysql.NewConnector()
@@ -132,7 +134,7 @@ func runService(cnf *config, logger, errorLogger *stdlog.Logger) error {
 	eventDispatcher.Start()
 	defer eventDispatcher.Stop()
 
-	newsLineQueryService := infrastructure.NewNewsLineQueryService(connector.TransactionalClient(), tarantoolClient)
+	newsLineQueryService := infrastructure.NewNewsLineQueryService(cnf.UseTarantool == 1, connector.TransactionalClient(), tarantoolClient)
 
 	stopChan := make(chan struct{})
 	server.ListenOSKillSignals(stopChan)

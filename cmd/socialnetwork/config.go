@@ -27,6 +27,8 @@ type config struct {
 	ServeRESTAddress   string `envconfig:"serve_rest_address" default:":80"`
 	ServiceRESTAddress string `envconfig:"service_rest_address" default:"http://service:80"`
 	ServiceGRPCAddress string `envconfig:"service_grpc_address" default:"service:81"`
+
+	ServiceID string `envconfig:"service_id" default:"1"`
 }
 
 func (c *config) realtimeHosts() ([]string, error) {

@@ -2,7 +2,6 @@ package inrastructure
 
 import (
 	api "github.com/callicoder/go-docker/pkg/common/api"
-	"github.com/callicoder/go-docker/pkg/common/infrastructure/request"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 
@@ -12,21 +11,6 @@ import (
 
 type ConversationService struct {
 	client api.ConversationClient
-}
-
-func (s ConversationService) GetConversationID(r *http.Request) (string, error) {
-	userID := request.GetIDFromRequest(r)
-	loggedUserID := GetUserIDFromContext(r)
-	req := &api.StartConversationRequest{
-		User:   loggedUserID,
-		Target: userID,
-	}
-	ctx := getGRPCContext(context.Background(), r)
-	res, err := s.client.StartConversation(ctx, req)
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-	return res.ConversationID, nil
 }
 
 func (s ConversationService) ListConversations(r *http.Request) ([]*api.UserConversation, error) {
@@ -40,6 +24,15 @@ func (s ConversationService) ListConversations(r *http.Request) ([]*api.UserConv
 		return []*api.UserConversation{}, errors.WithStack(err)
 	}
 	return res.Conversations, nil
+}
+
+func (s ConversationService) GetCompanion(r *http.Request, conversationID string) (string, error) {
+	req := &api.GetConversationRequest{
+		ConversationID: conversationID,
+	}
+	ctx := getGRPCContext(context.Background(), r)
+	res, err := s.client.GetConversation(ctx, req)
+	return res.CompanionID, err
 }
 
 func (s ConversationService) ListMessages(r *http.Request, conversationID string) ([]*api.Message, error) {

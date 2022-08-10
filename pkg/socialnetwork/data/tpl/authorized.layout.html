@@ -1,24 +1,31 @@
 {{define "authorizedLayout"}}
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" style="height:calc(100% - 120px);height:-webkit-calc(100% - 120px);height:-moz-calc(100% - 120px);">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
     {{template "header" .}}
     <title>{{template "title" .}}</title>
 </head>
-<body>
-<div class="container">
+<body style="height:100%;">
+<div class="container" style="margin-top: 50px;height:100%;">
     {{template "main" .}}
 </div>
-<div class="footer">
-    <a href="/app/logout">Logout</a>
-    <a href="/app/user/list">Users</a>
-    <a href="/app/conversation/list">Conversations</a>
-    <a href="/app/post/list">Posts</a>
-    <a href="/app/post/news">New Posts</a>
-    <a href="/app/profile">My Profile</a>
+<div class="footer py-3 my-4" style="position: absolute;bottom: 0;width: 100%;">
+    <ul class="container nav justify-content-center border-bottom pb-3 mb-3">
+        <li class="nav-item"><a class="nav-link px-2 text-muted" href="/app/logout">Logout</a></li>
+        <li class="nav-item"><a class="nav-link px-2 text-muted" href="/app/user/list">Users</a></li>
+        <li class="nav-item"><a class="nav-link px-2 text-muted" href="/app/conversation/list">Conversations</a></li>
+        <li class="nav-item"><a class="nav-link px-2 text-muted" href="/app/post/list">Posts</a></li>
+        <li class="nav-item"><a class="nav-link px-2 text-muted" href="/app/post/news">New Posts</a></li>
+        <li class="nav-item"><a class="nav-link px-2 text-muted" href="/app/profile">My Profile</a></li>
+    </ul>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-pprn3073KE6tl6bjs2QrFaJGz5/SUsLqktiwsUTF55Jfv3qYSDhgCecCxMW52nD2"
+        crossorigin="anonymous"></script>
 </body>
 </html>
 {{template "script" .}}
